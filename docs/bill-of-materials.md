@@ -3,6 +3,66 @@
 Chosen parts with the reasoning behind each choice, plus the gotchas that cost a week if missed.
 Prices are **overestimated** single-unit retail (Oct 2026) — verify current prices before ordering.
 
+## STATUS: ORDERED 2026-10-06
+
+Everything below is what was actually purchased, which closes the hardware half of M0.
+
+| Part | Role | Source | Price |
+|---|---|---|---|
+| **Raspberry Pi 4 Model B, 1 GB** (SKU SC0192) | the computer | PiShop.us (authorized reseller) | $35.00 |
+| **TSL2591** breakout, 3 V/5 V, I2C | sensor 1 — sky brightness | Amazon (EC Buying) | ~$11 |
+| **MLX90614 / GY-906, 3.3 V variant** | sensor 2 — zenith IR temperature (cloud) | Amazon (Teyleten Robot) | ~$13 |
+| **BME280**, 3.3 V, I2C/SPI, includes jumper wires | sensor 3 — ambient temp / humidity / pressure | Amazon | ~$9 |
+
+**Three sensors. The DS3231 RTC is a clock, not a sensor** — it measures nothing and is not part of
+the fusion, but it is still required (offline means no NTP; see Decisions below). **Not yet ordered.**
+
+### Why the 1 GB Pi
+
+Headless Raspberry Pi OS Lite uses ~300 MB and our workload is a handful of small C daemons at
+≤1 Hz. More RAM buys nothing here, and DRAM prices are currently elevated — the same store lists the
+Pi 4 2 GB at $67.50 and the Pi 5 2 GB at $77.50. The 1 GB Pi 4 is also on the spec's approved
+platform list (§17: any Pi with the 40-pin header).
+
+### Why the 3.3 V MLX90614 specifically — this was a real decision, not a preference
+
+The GY-906 breakout ties its I2C pull-up resistors to VCC. Powered at 5 V, SDA and SCL sit at 5 V and
+run straight into Pi GPIO, which has **no 5 V tolerance and no overvoltage protection** (spec §17
+calls this out as the most popular way to lose a Pi). The listing offered both a 5 V and a 3.3 V
+pack; we took the **3.3 V** pack so the entire bus stays at 3.3 V.
+
+Side effect worth knowing: 3.3 V MLX90614 variants often have a narrower field of view than the 5 V
+parts. That is acceptable and arguably better — a narrower view of the zenith is less likely to catch
+a roof edge or tree branch, which would radiate at its own temperature and corrupt ΔT.
+
+### Verification checklist — do this the day the parts arrive
+
+Results go in [`hardware-log.md`](hardware-log.md). Do all five before writing a line of C.
+
+1. `i2cdetect -y 1` → expect **0x29** (TSL2591) and **0x5A** (MLX90614) and **0x76** (BME280).
+2. **Read the BME280 chip-ID register: `0x60` = genuine BME280, `0x58` = a BMP280 with no humidity
+   sensor → return it immediately.** The listing claims humidity, but listings are not evidence.
+3. MLX90614 pointed at open night sky vs. an indoor wall — sky should read tens of °C colder. If they
+   match, something is in the field of view or the part is bad.
+4. **The window-material test, which de-risks the project's largest hardware unknown.** Hold acrylic
+   in front of the MLX90614: the cold-sky reading should disappear, confirming acrylic is opaque in
+   its 8–14 µm band. Then try thin LDPE film and confirm the cold reading survives.
+5. TSL2591 at max gain in a sealed dark box — record the dark offset; this is the noise floor every
+   night-sky reading sits on.
+
+### Still to buy
+
+| Part | Why | Est. |
+|---|---|---|
+| USB-C power supply, 5.1 V 3 A | **The Pi will not boot without it.** Use a real supply, not a phone charger — undervoltage causes instability and SD corruption that looks exactly like a software bug. | $10 |
+| microSD, high-endurance 32 GB | We write continuously for weeks; dashcam-rated cards exist for this. | $14 |
+| DS3231 RTC + LIR2032 | Offline timekeeping. Without it the sun/moon ephemeris is impossible. | $7 |
+| Enclosure, window materials | Home Depot / Lowe's. LDPE film for the IR aperture. | $14 |
+
+Jumper wires came bundled with the BME280.
+
+---
+
 ## Decisions
 
 ### Sky brightness → **TSL2591**
