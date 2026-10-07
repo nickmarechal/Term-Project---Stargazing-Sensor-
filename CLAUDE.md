@@ -12,15 +12,22 @@ and is not required to work in this repo.)
 
 ## Project status (update this as things get decided)
 
-- **Idea:** NOT YET CHOSEN. Standing top candidate is a driveway vehicle-identification device
-  (magnetometer + presence sensor), scoped to distinguishing two meaningfully different
-  vehicles — *not* "my car vs. a lookalike," which the 1/r^3 falloff of a magnetic dipole makes
-  unreliable at this price point. Requires a week-1 signature-repeatability test before the
-  problem memo commits to it.
+- **Idea: LOCKED — Dark Sky Monitor.** An offline device that measures sky brightness and cloud
+  cover at one site and grades the night GOOD / MARGINAL / POOR / UNKNOWN with the evidence behind
+  the verdict. Full design review in [`docs/design-review.md`](docs/design-review.md).
 - **Team:** Nick Marechal + Liam Sagal.
-- **Hardware:** not yet ordered. Shipping time is the most common silent schedule-killer
-  (spec §16) — order the day the idea is picked.
-- **Repo name:** `term-project` for now. Rename once the idea is locked.
+- **Hardware: ORDERED 2026-10-06** — Pi 4 Model B **1 GB** + TSL2591 + MLX90614 (**3.3 V** variant)
+  + BME280. See [`docs/bill-of-materials.md`](docs/bill-of-materials.md).
+  **Still to buy: USB-C PSU (5.1 V 3 A), microSD, DS3231 RTC, enclosure.** The Pi does not boot
+  without the first two.
+- **Mechanisms: D** (crash-consistent storage) **+ E** (multiprocess + IPC + supervisor). C and F
+  were considered and rejected — at 0.1–1 Hz sampling neither is justified, and being able to say
+  why is a stronger defense answer than bolting them on.
+- **Next action:** the five-step bring-up checklist in
+  [`docs/hardware-log.md`](docs/hardware-log.md) the day the parts land. Step 4 (acrylic vs. LDPE
+  film in front of the MLX90614) tests the largest hardware unknown in the project.
+- **Open gap:** the problem memo names an archetype, not a named individual. Outreach to the
+  Northern Colorado Astronomical Society / CSU astronomy faculty still pending.
 
 ## Commands
 

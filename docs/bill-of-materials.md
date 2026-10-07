@@ -9,7 +9,7 @@ Everything below is what was actually purchased, which closes the hardware half 
 
 | Part | Role | Source | Price |
 |---|---|---|---|
-| **Raspberry Pi 4 Model B, 1 GB** (SKU SC0192) | the computer | PiShop.us (authorized reseller) | $35.00 |
+| **Raspberry Pi 4 Model B, 1 GB** (SKU SC0192) — ordered | the computer | PiShop.us (authorized reseller) | $35.00 |
 | **TSL2591** breakout, 3 V/5 V, I2C | sensor 1 — sky brightness | Amazon (EC Buying) | ~$11 |
 | **MLX90614 / GY-906, 3.3 V variant** | sensor 2 — zenith IR temperature (cloud) | Amazon (Teyleten Robot) | ~$13 |
 | **BME280**, 3.3 V, I2C/SPI, includes jumper wires | sensor 3 — ambient temp / humidity / pressure | Amazon | ~$9 |

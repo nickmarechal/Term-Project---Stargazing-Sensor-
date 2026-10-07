@@ -7,9 +7,8 @@ Prof. Shrideep Pallickara.
 
 **Team:** Nick Marechal, Liam Sagal
 
-> **Status: M0.** Repo and `CLAUDE.md` initialized; transcripts being copied out per milestone.
-> The device concept is not yet locked — see `PROBLEM.md`. The repo name is a placeholder and
-> will change when the idea does.
+> **Status: M1 → M2.** Concept locked (**Dark Sky Monitor**), problem memo written, sensors and
+> Pi ordered 2026-10-06. Next: sensor bring-up (`docs/hardware-log.md`) and the M2 design document.
 
 ## What this will be
 
