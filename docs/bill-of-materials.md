@@ -92,17 +92,74 @@ Used Pi 4/3B+ ($35) · SD ($14) · PSU ($10) · TSL2591 clone ($11) · MLX90614 
 | Power resistor (~10–22 Ω) + MOSFET + wire | Dew heater for the IR aperture. Turns failure mode #4 into a feature and adds a measurable control loop. | $8 |
 | 3D-printed sensor shroud | **Ask whether CSU has a makerspace printer** — likely free. | $0 |
 
-## Where to buy
+## Purchasing plan
 
-| Source | Speed to Fort Collins | Use it for |
+We are **buying and keeping** everything — no loaned or borrowed parts. Two orders, split by whether
+authenticity matters.
+
+### Order 1 — Adafruit (the three sensors + RTC)
+
+One order, one shipping fee, all four parts authentic, and every one has a written tutorial and a
+maintained C/Python library. This is the single most important order to get right, because the
+sensors are where counterfeits and flaky clones cost whole weeks.
+
+| Search Adafruit for | Part # | Est. |
 |---|---|---|
-| **CSU ECE stockroom / makerspace** | **Today** | Ask first. Free beats fast. |
-| **SparkFun** (Niwot, CO — ~45 min away) | 1–2 days ground, in-state | **Best paid option.** Authentic parts, genuinely local. |
-| **Amazon Prime** | 1–2 days | Whatever the above can't cover. Cheapest, but see the counterfeit warning. |
-| **Adafruit** (NYC) | 3–7 days standard | Best quality + documentation. Use if the timeline allows. |
-| **DigiKey / Mouser** | 1–2 days | Guaranteed-authentic parts. |
+| "TSL2591 High Dynamic Range Digital Light Sensor" | 1980 | $7–11 |
+| "MLX90614 Contact-less Infrared Thermopile Sensor" | 1747 | $17–20 |
+| "BME280 I2C or SPI Temperature Humidity Pressure Sensor" | 2652 | $15–17 |
+| "DS3231 Precision RTC" (breakout or STEMMA QT) | 5188 / 3013 | $7–14 |
 
-Raspberry Pi itself: an authorised reseller, or used locally to save $20.
+**Choose USPS Priority Mail at checkout**, not ground — from NYC to Colorado that is roughly 2–3
+days rather than 4–6, for a few dollars more.
+
+**Check SparkFun first anyway** (Niwot, CO — ~45 min from Fort Collins). They definitely stock the
+BME280, and anything they do carry arrives in 1–2 days in-state. Their catalogue for the TSL2591 /
+MLX90614 / DS3231 is less certain — if they have them, buy local; otherwise Adafruit covers everything.
+
+### Order 2 — Amazon (Pi + commodity hardware)
+
+These parts are identical wherever you buy them, so take the fastest shipping.
+
+| Search Amazon for | What to pick | Est. |
+|---|---|---|
+| "CanaKit Raspberry Pi 4 Starter Kit" or "Vilros Raspberry Pi 4 kit" | A kit bundling the Pi 4 (2 GB or 4 GB), **official-spec USB-C power supply**, case, fan and heatsinks. Buying the kit removes the undervoltage risk and the enclosure question in one click. | $95–120 |
+| "SanDisk High Endurance microSD 32GB" or "Samsung PRO Endurance 32GB" | **Buy this even though the kit includes a card.** Kit cards are generic and will wear out under continuous logging. Use the kit card as a spare. | $12–15 |
+| "Dupont female to female jumper wires 20cm" | A 120-wire assortment. Female-to-female connects breakout headers straight to the Pi's GPIO. | $7–9 |
+| "830 point breadboard" | Prototype before anything goes in a box. | $7 |
+| "IP65 junction box" / "weatherproof project enclosure" | ~6×4×3 in, hinged lid, cable gland. **Home Depot or Lowe's in person is cheaper and immediate** for this one. | $12–15 |
+
+**If a Micro Center is within driving distance of the Front Range, check it first** — they stock
+Raspberry Pi boards and sensors, and same-day pickup beats any shipping. Worth one phone call.
+
+### Buying the Pi separately instead of as a kit
+
+Cheaper but more pieces: Pi 4 (2 GB) ~$55 from an authorised reseller (Adafruit, PiShop.us,
+Chicago Electronic Distributors, Newark) + **official** 5.1 V 3 A USB-C PSU ~$10 + case ~$12. Only do
+this if the kit price looks inflated — the kit's bundled official-spec PSU is worth real money in
+avoided debugging.
+
+### Verify the day the parts arrive
+
+Do all of this before writing a line of C. Each item has cost somebody a week.
+
+1. `i2cdetect -y 1` → expect **0x29** (TSL2591), **0x5A** (MLX90614), **0x76** (BME280), **0x68**
+   (DS3231). Anything missing is a wiring or address problem, not a software problem.
+2. **Read the BME280's chip-ID register: 0x60 = genuine BME280, 0x58 = a BMP280 with no humidity
+   sensor.** If it reads 0x58, return it immediately.
+3. Point the MLX90614 at the open sky on a clear night and at a wall indoors. Expect a sky reading
+   tens of degrees colder than the wall. If both read about the same, something is in the field of
+   view or the part is bad.
+4. **Test the IR window material now.** Hold acrylic in front of the MLX90614 — the cold-sky reading
+   should vanish, confirming acrylic is opaque in its band. Then try thin LDPE film and confirm the
+   cold reading survives. This single ten-minute test de-risks the project's largest hardware
+   unknown.
+5. Confirm the DS3231 keeps time across a full power-off.
+
+### Money
+
+Roughly **$150–190 all-in**, so **$75–95 each** split two ways. One partner should place both orders
+and the other reimburses — splitting an order across two accounts just doubles the shipping.
 
 ## Gotchas that cost a week if missed
 
