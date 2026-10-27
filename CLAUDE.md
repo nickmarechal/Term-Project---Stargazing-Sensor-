@@ -16,16 +16,20 @@ and is not required to work in this repo.)
   cover at one site and grades the night GOOD / MARGINAL / POOR / UNKNOWN with the evidence behind
   the verdict. Full design review in [`docs/design-review.md`](docs/design-review.md).
 - **Team:** Nick Marechal + Liam Sagal.
-- **Hardware: ORDERED 2026-10-06** — Pi 4 Model B **1 GB** + TSL2591 + MLX90614 (**3.3 V** variant)
-  + BME280. See [`docs/bill-of-materials.md`](docs/bill-of-materials.md).
-  **Still to buy: USB-C PSU (5.1 V 3 A), microSD, DS3231 RTC, enclosure.** The Pi does not boot
-  without the first two.
+- **Where we left off: [`docs/progress-log.md`](docs/progress-log.md). Read it first.** Newest
+  entry on top: milestone position, what code exists and what it guarantees, the shared record
+  contract, and the open work. Add an entry there when you finish a chunk of work.
+- **Hardware: ARRIVED 2026-10-13** — Pi 4 Model B **1 GB** + TSL2591 + MLX90614 (**3.3 V** variant)
+  + BME280. See [`docs/bill-of-materials.md`](docs/bill-of-materials.md). Pi set up headless
+  2026-10-27 (`darksky.local`, I2C on, power `0x0`); **sensors not wired yet.** DS3231 RTC and
+  enclosure still unbought; until the RTC exists the Pi takes real time from the network at boot.
 - **Mechanisms: D** (crash-consistent storage) **+ E** (multiprocess + IPC + supervisor). C and F
   were considered and rejected — at 0.1–1 Hz sampling neither is justified, and being able to say
   why is a stronger defense answer than bolting them on.
-- **Next action:** the five-step bring-up checklist in
-  [`docs/hardware-log.md`](docs/hardware-log.md) the day the parts land. Step 4 (acrylic vs. LDPE
-  film in front of the MLX90614) tests the largest hardware unknown in the project.
+- **Next action:** wire the sensors and run the bring-up checklist in
+  [`docs/hardware-log.md`](docs/hardware-log.md) (M2: "both sensors electrically alive"). Step 4
+  (acrylic vs. LDPE film in front of the MLX90614) tests the largest hardware unknown in the
+  project. `DESIGN.md` (M2) is still unwritten.
 - **Open gap:** the problem memo names an archetype, not a named individual. Outreach to the
   Northern Colorado Astronomical Society / CSU astronomy faculty still pending.
 
