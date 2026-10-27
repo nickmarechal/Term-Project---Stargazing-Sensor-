@@ -69,9 +69,13 @@ Ownership means **first authorship and answerability at the defense**, not exclu
 partner is individually examined on their own subsystems plus one question from across the
 boundary.
 
-- `nick/`: TODO once the architecture is decided
-- `TEAMMATE/`: TODO once the architecture is decided
-- Shared: supervisor, interface.
+- **Nick:** `src/common/` (record format + CRC — owned by storage, used by everyone) and
+  `src/store/` — mechanism **D**, the crash-consistent storage layer.
+- **Liam (proposed — Liam to confirm):** `src/super/`, `src/sensors/`, and the IPC — mechanism
+  **E**, the supervisor and the sensor daemons. All Linux-only I2C code lives in `src/sensors/`,
+  so everything else builds and tests on a Mac.
+- **To decide together:** analysis (ephemeris, features, classifier, state machine) and the
+  query CLI.
 - The agent edits outside the current session owner's area only when told explicitly whose
   session this is.
 

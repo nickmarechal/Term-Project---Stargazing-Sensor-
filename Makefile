@@ -1,68 +1,43 @@
-# term-project — CS 370
-# Targets here are real and run today. Several are no-ops until there is source
-# to build. If a target stops doing what its name says, fix it or rename it —
-# CLAUDE.md treats a lying target as a bug.
+# term-project (Dark Sky Monitor) — CS 370
+# Every target does what its name says. CLAUDE.md treats a lying target as a bug.
 
-CC       := gcc
-CSTD     := -std=c17
-WARN     := -Wall -Wextra -Werror
-CFLAGS   := $(CSTD) $(WARN) -O2 -g
-SANFLAGS := -fsanitize=address,undefined -fno-omit-frame-pointer -g -O1
-LDFLAGS  :=
+CC := gcc
 
-SRCDIR   := src
-TESTDIR  := tests
-BUILDDIR := build
-BIN      := $(BUILDDIR)/term-project
+# _POSIX_C_SOURCE: with -std=c17, the Pi's glibc hides fsync, ftruncate, pread
+# and clock_gettime unless this is defined, and -Werror then fails the build.
+# macOS shows them anyway, so leaving this out would only break on the Pi.
+CFLAGS := -std=c17 -Wall -Wextra -Werror -g -O1 -Isrc -Itests \
+          -D_POSIX_C_SOURCE=200809L
+SANFLAGS := -fsanitize=address,undefined -fno-omit-frame-pointer
 
-SRCS := $(wildcard $(SRCDIR)/*.c)
-OBJS := $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(SRCS))
+# Library code (no main). Each step adds its files here.
+SRC  :=
+TSRC := tests/test_main.c
+HDR  := tests/check.h
 
-.PHONY: all test asan memcheck soakcheck deploy clean help
+TESTBIN := build/test_all
 
-## all: build the systems core
-all:
-	@if [ -z "$(SRCS)" ]; then \
-	    echo "make: no sources in $(SRCDIR)/ yet (project is at M0) - nothing to build."; \
-	  else \
-	    $(MAKE) --no-print-directory $(BIN); \
-	  fi
+## all: build the test binary
+all: $(TESTBIN)
 
-$(BIN): $(OBJS) | $(BUILDDIR)
-	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)
+$(TESTBIN): $(SRC) $(TSRC) $(HDR)
+	@mkdir -p build
+	$(CC) $(CFLAGS) $(SRC) $(TSRC) -o $@
 
-$(BUILDDIR)/%.o: $(SRCDIR)/%.c | $(BUILDDIR)
-	$(CC) $(CFLAGS) -c $< -o $@
+## test: run every test suite
+test: $(TESTBIN)
+	./$(TESTBIN)
 
-$(BUILDDIR):
-	@mkdir -p $(BUILDDIR)
+## asan: rebuild with AddressSanitizer + UBSan and run the tests
+asan: CFLAGS += $(SANFLAGS)
+asan: clean test
 
-## test: run the test suite
-test:
-	@if [ -z "$(wildcard $(TESTDIR)/*.c)" ]; then \
-	    echo "make test: no tests in $(TESTDIR)/ yet (project is at M0)."; \
-	  else \
-	    echo "TODO: wire up the test runner when the first test lands."; exit 1; \
-	  fi
-
-## asan: build and run under AddressSanitizer + UBSan
-asan:
-	@if [ -z "$(SRCS)" ]; then \
-	    echo "make asan: no sources yet (project is at M0)."; \
-	  else \
-	    mkdir -p $(BUILDDIR)/asan; \
-	    $(CC) $(CSTD) $(WARN) $(SANFLAGS) $(SRCS) -o $(BUILDDIR)/asan/term-project; \
-	    echo "built $(BUILDDIR)/asan/term-project - run it to collect findings."; \
-	  fi
-
-## memcheck: run under valgrind (Linux/Pi; not available on macOS ARM)
-memcheck:
+## memcheck: run the tests under valgrind (Linux/Pi only, not on macOS)
+memcheck: all
 	@if ! command -v valgrind >/dev/null 2>&1; then \
 	    echo "make memcheck: valgrind not installed here (expected on macOS - run this on the Pi)."; \
-	  elif [ ! -x $(BIN) ]; then \
-	    echo "make memcheck: build first ($(BIN) not present)."; \
 	  else \
-	    valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=1 $(BIN); \
+	    valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=1 ./$(TESTBIN); \
 	  fi
 
 ## soakcheck: 1-hour miniature of the graded 48h soak
@@ -81,8 +56,10 @@ deploy:
 
 ## clean: remove build artifacts
 clean:
-	@rm -rf $(BUILDDIR)
+	rm -rf build
 
 ## help: list targets
 help:
 	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/^## /  /'
+
+.PHONY: all test asan memcheck soakcheck deploy clean help
