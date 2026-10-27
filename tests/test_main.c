@@ -1,4 +1,5 @@
 #include "check.h"
+#include "suites.h"
 
 #include <stdio.h>
 
@@ -7,7 +8,7 @@ int check_failures;
 
 int main(void)
 {
-    /* Each step adds its suite here. */
+    test_crc32();
 
     printf("%d checks, %d failed\n", check_count, check_failures);
     return check_failures == 0 ? 0 : 1;

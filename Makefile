@@ -11,9 +11,9 @@ CFLAGS := -std=c17 -Wall -Wextra -Werror -g -O1 -Isrc -Itests \
 SANFLAGS := -fsanitize=address,undefined -fno-omit-frame-pointer
 
 # Library code (no main). Each step adds its files here.
-SRC  :=
-TSRC := tests/test_main.c
-HDR  := tests/check.h
+SRC  := src/common/crc32.c
+TSRC := tests/test_main.c tests/test_crc32.c
+HDR  := tests/check.h tests/suites.h src/common/crc32.h
 
 TESTBIN := build/test_all
 
