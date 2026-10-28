@@ -46,12 +46,10 @@ brightness, IR sky temperature, and ambient conditions, matching how fast each s
                      page cache → ext4 → mmc driver → 16 GB microSD: ≈5.7 MB/day
 ```
 
-Rates: 1.37 rec/s into `stored` = 1.3 SAMPLE + 4 FEATURE/min + ≥1 STATE/10 min, ≈5.7 MB/day
-(computed). 6 HEARTBEAT/h = five children + `dskyd`. I2C transfer counts are our planned read
-sequences, checked at bring-up (hardware-log §1–3). Every channel is `AF_UNIX`, a pipe, shared
-memory or a signal: **no IP sockets**; the user reaches `dsq` over SSH. Intervals use
-`CLOCK_MONOTONIC`, labels `CLOCK_REALTIME`; `fusiond` checks clock sync with `adjtimex()` 1/min
-(no RTC until the DS3231 ordered 2026-10-27 is fitted; see Constraints).
+Rates are computed from the sample periods (derivation in
+[`docs/record-and-ipc.md`](docs/record-and-ipc.md)). Every channel is `AF_UNIX`, a pipe, shared
+memory or a signal: **no IP sockets**; the user reaches `dsq` over SSH. `fusiond` checks clock
+sync with `adjtimex()` 1/min (no RTC yet; see Constraints).
 
 | Process | Job (owners: see Ownership map) |
 |---------|------------------------------------------------------------------------------|
@@ -89,31 +87,18 @@ product's memory, and a device on a yard extension cord sees brownouts (spec §1
 rather than per record, with writes batched every 10 s to spare the card. CRC-sealed fixed-size
 records make "truncate at the first bad record" a complete recovery rule.
 
-**Isolation boundaries (E).** Each process boundary contains one failure: `skyd` — an I2C hang
-in brightness must not stop cloud sensing; `cloudd` — the most failure-prone part (SMBus quirk),
-isolated; `envd` — the humidity input, fails independently; `fusiond` — analysis can crash and
-restart without stopping sampling; `stored` — a single writer rules out multi-writer corruption by
-construction; `dskyd` — must outlive every child, and is itself restarted by systemd.
+**Isolation (E):** one failure domain per process. A hang in one sensor (the MLX90614's SMBus
+quirk is the likeliest) can't stop the others; analysis restarts without stopping sampling;
+`stored` is the single writer; `dskyd` outlives them all.
 
-**Ring invariants (E).** One single-producer/single-consumer ring per sensor; `dskyd` creates the
-shared memory before the fork. Chosen over sockets for **decoupled lifetimes**, not speed (1.3
-rec/s is slow): samples keep queuing while `fusiond` restarts, and a sensor never blocks on it.
+**Ring invariants (E).** Shared-memory rings were chosen for **decoupled lifetimes, not speed**:
+samples keep queuing while `fusiond` restarts. The rules: publish-after-write (release/acquire on
+`head`), CRC check on read, never overwrite unread (`head − tail < N`), duplicates after a reader
+restart removed by (source, run, seq), and a lock-free `_Static_assert` (**assumed, confirmed at
+build on the Pi**). Full statement in [`docs/record-and-ipc.md`](docs/record-and-ipc.md).
 
-1. **Publish after write:** fill slot `head % N` with a sealed record, *then* release-store
-   `head`; the reader acquire-loads `head`. A producer killed mid-copy never exposes the slot.
-2. **CRC on read:** the reader checks `record_intact()` on its copy; a torn slot is counted and
-   dropped.
-3. **Never overwrite unread:** write only while `head − tail < N`; when full, drop the *new*
-   sample and count an overrun (the `seq` gap proves it).
-4. **Reader restart:** `tail` advances only after forwarding, so a killed `fusiond` may re-send
-   one record; the duplicate (source, run, seq) is removed at query time.
-5. **Lock-free:** `_Static_assert(ATOMIC_INT_LOCK_FREE == 2)`, because a lock-based atomic
-   deadlocks if a process dies holding it. **Assumed, confirmed at build on the Pi.**
-
-**Rejected.** **C** (real-time): sky brightness changes over minutes, so no path has a deadline.
-**F** (no-drop high-rate): 1.3 rec/s total; a high-rate pipeline would be padding. **A** (driver)
-is a stretch goal only if M3 lands early; **B** would only be honest with a pulse-output sensor
-(TSL237) we did not buy.
+**Rejected:** C and F (at 1.3 rec/s nothing has a deadline or a rate to sustain); A is a stretch
+goal; B needs a pulse-output sensor we didn't buy.
 
 ## Failure-mode table
 
@@ -154,20 +139,13 @@ Everything in this section is **proposed (Liam), Nick to confirm**, except where
   shutdown; directory `fsync()` after creating a segment. **Retention:** raw 180 days, rollups
   forever; below 2 GB free, raw writes stop (logged) and rollups and heartbeats continue.
 
-| `source_id` | `kind` | `v[0]` · `v[1]` · `v[2]` · `v[3]` |
-|-------------|------------|-------------------------------------------------------|
-| 1 `skyd` | SAMPLE | CH0 count · CH1 count · gain multiplier · integration ms |
-| 2 `cloudd` | SAMPLE | sky (object) m°C · ambient m°C · 0 · 0 |
-| 3 `envd` | SAMPLE | temperature m°C · humidity milli-%RH · pressure Pa · 0 |
-| 4 `fusiond` | FEATURE; STATE | feature id · value ×1000 · window s · n; state · rules-fired bitmask · confidence ×1000 · 0 |
-| 5 `dskyd` | HEARTBEAT | subject `source_id` · RSS KiB · CPU ms · cumulative events |
-| any (6 `stored`) | FAULT; START | code · errno · consecutive count · 0; run number · 0 · 0 · 0 |
-
-`source_id` 0 is reserved. Flags: `VALID`, `STALE`, `SYNTHETIC` (all replayed or provoked
-data), `CALIBRATING`, plus a new `CLOCK_UNSYNC` bit, with no layout change. A failed read is a
-**FAULT**; a read with an implausible value is a **SAMPLE without `VALID`**. `seq` counts per
-(source, run): every process start writes a START record (`seq` 0, run number from `dskyd`). A
-gap within a run is provable loss; the gap between runs is the restart time.
+- **Contents** (field layout, payloads and full rate derivation in
+  [`docs/record-and-ipc.md`](docs/record-and-ipc.md)): SAMPLEs carry raw sensor values in
+  fixed-point (TSL2591 counts + gain, temperatures in m°C, humidity, pressure); `fusiond` writes
+  FEATURE and STATE; `dskyd` writes HEARTBEAT; any process writes FAULT and START. A failed read
+  is a **FAULT**; an implausible value is a **SAMPLE without `VALID`**; replayed or provoked data
+  carries `SYNTHETIC`. `seq` counts per (source, run), and each run begins with a START record,
+  so a gap within a run is provable loss.
 
 **Power cut mid-write.** At most the last 60 s are lost (R-D1). The open segment may end in a
 torn record or in zeros, and an all-zero record never passes its CRC (*tested*). On start,
