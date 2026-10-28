@@ -36,6 +36,11 @@ STORE_ITSRC      := tests/itest_stored.c
 SENSOR_SRC  := src/sensors/convert.c
 SENSOR_TSRC := tests/test_convert.c
 SENSOR_HDR  := src/sensors/convert.h
+# Linux only (<linux/i2c-dev.h>): the I2C layer, the shared daemon loop, and
+# one small main per program in build/.
+SENSOR_LINUX_SRC := src/sensors/i2c.c src/sensors/chips.c src/sensors/daemon.c
+SENSOR_LINUX_HDR := src/sensors/i2c.h src/sensors/chips.h src/sensors/daemon.h
+SENSOR_BIN       := build/skyd build/cloudd build/envd build/sensorcheck
 
 SRC  := $(COMMON_SRC) $(STORE_SRC) $(DSQ_LIB) $(SENSOR_SRC)
 TSRC := tests/test_main.c $(COMMON_TSRC) $(STORE_TSRC) $(SENSOR_TSRC)
@@ -48,6 +53,10 @@ UNAME := $(shell uname -s)
 ifeq ($(UNAME),Linux)
 LINUX_BIN  := build/stored build/itest_stored
 LINUX_TEST := itest
+endif
+
+ifeq ($(UNAME),Linux)
+LINUX_BIN += $(SENSOR_BIN)
 endif
 
 ## all: build the test binary and dsq (and stored + its integration test on Linux)
@@ -69,6 +78,11 @@ build/itest_stored: $(STORE_ITSRC) $(STORE_CLIENT_SRC) $(COMMON_SRC) $(COMMON_HD
                     $(STORE_HDR) $(STORE_CLIENT_HDR) tests/check.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(STORE_ITSRC) $(STORE_CLIENT_SRC) $(COMMON_SRC) -o $@
+
+$(SENSOR_BIN): build/%: src/sensors/%.c $(SENSOR_LINUX_SRC) $(SENSOR_SRC) $(STORE_CLIENT_SRC) \
+               $(COMMON_SRC) $(SENSOR_LINUX_HDR) $(SENSOR_HDR) $(STORE_CLIENT_HDR) $(COMMON_HDR)
+	@mkdir -p build
+	$(CC) $(CFLAGS) $< $(SENSOR_LINUX_SRC) $(SENSOR_SRC) $(STORE_CLIENT_SRC) $(COMMON_SRC) -o $@
 
 ## test: run every test suite
 test: $(TESTBIN)
