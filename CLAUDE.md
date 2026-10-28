@@ -23,7 +23,8 @@ and is not required to work in this repo.)
   **3.3 V** + BME280; arrived 2026-10-13, set up headless 2026-10-27, I2C on, power `0x0`) is the
   **device of record**: the soak, the demo and every evaluation number come only from it.
   **`starlight.local`** (Liam's dev Pi + the same three sensors) is for parallel development only.
-  **No sensors wired on either kit yet.** DS3231 RTC to be ordered; until it is fitted the Pi
+  **`darksky.local`: all three sensors wired and answering 2026-10-28** (`0x29`, `0x5a`, `0x76`;
+  BME280 genuine). `starlight.local` not wired. DS3231 RTC to be ordered; until it is fitted the Pi
   takes real time from the network at boot. Enclosure still unbought. See
   [`docs/hardware-log.md`](docs/hardware-log.md) and [`docs/bill-of-materials.md`](docs/bill-of-materials.md).
 - **Mechanisms: D** (crash-consistent storage) **+ E** (multiprocess + IPC + supervisor). C and F
@@ -33,9 +34,8 @@ and is not required to work in this repo.)
   the 2026-10-27 M2 entry of [`docs/progress-log.md`](docs/progress-log.md)) were confirmed by
   Nick on 2026-10-28. Values marked (a) are datasheet assumptions,
   not measurements. Record, IPC and supervision detail: [`docs/record-and-ipc.md`](docs/record-and-ipc.md).
-- **Next action:** wire `darksky.local` and run hardware-log §1–5 **by 2026-11-03**. M2's
-  "both sensors electrically alive" was **not met** at the deadline (a dated known gap in
-  DESIGN.md and the hardware log). Step 4 (acrylic vs. LDPE film in front of the MLX90614) tests
+- **Next action:** finish hardware-log §3–5 on `darksky.local` (§1–2 done 2026-10-28, which met
+  M2's "both sensors electrically alive"). Step 4 (acrylic vs. LDPE film in front of the MLX90614) tests
   the largest hardware unknown in the project.
 - **Open gap:** the problem memo names an archetype, not a named individual. Outreach to the
   Northern Colorado Astronomical Society / CSU astronomy faculty still pending.

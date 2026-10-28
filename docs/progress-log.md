@@ -20,8 +20,10 @@ verified, and what it leaves open.
   plus its two subagent sessions. One change from as-is: a password typed into chat on
   2026-10-27 is replaced with `[REDACTED-PASSWORD]` (see `transcripts/README.md`). The session
   keeps going after this snapshot; the M3 copy picks up the rest.
-- **Sensors still not wired.** M2's "both sensors electrically alive" is submitted as the known
-  gap already recorded in `DESIGN.md` and the hardware log (target 2026-11-03).
+- **Sensors wired and alive** on `darksky.local`, closing M2's "both sensors electrically
+  alive" before submission. Raw output in `hardware-log.md` §1–2: all three answer at `0x29`,
+  `0x5a`, `0x76`; the BME280 is genuine (`0x60`); the TSL2591 ID is `0x50`; first MLX90614 and
+  TSL2591 readings are plausible. Wiring table in §1. Still open: hardware-log §3–5.
 - **Submission files** (outside the repo): `Term Project/submissions/cs370-DarkSkyMonitor-M2-20261028.zip`
   and `.tar.gz`, built from a clean clone of the commit that adds this entry.
 

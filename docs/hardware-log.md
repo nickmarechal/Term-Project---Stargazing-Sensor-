@@ -33,21 +33,22 @@ found.
 | Item | Ordered | Arrived | Verified | Notes |
 |---|---|---|---|---|
 | Raspberry Pi 4 (1 GB) | 2026-10-06 | 2026-10-13 | 2026-10-27 | PiShop.us, $35. Boots, SSH, I2C on — see §0 |
-| TSL2591 | 2026-10-06 | 2026-10-13 | | Amazon, EC Buying, 3 V/5 V. Not wired yet |
-| MLX90614 / GY-906 | 2026-10-06 | 2026-10-13 | | Amazon, **3.3 V pack**. Not wired yet |
-| BME280 | 2026-10-06 | 2026-10-13 | | Amazon, incl. jumper wires. Not wired yet |
+| TSL2591 | 2026-10-06 | 2026-10-13 | 2026-10-28 | Amazon, EC Buying, 3 V/5 V. Answers at `0x29`, ID `0x50` — see §1 |
+| MLX90614 / GY-906 | 2026-10-06 | 2026-10-13 | 2026-10-28 | Amazon, **3.3 V pack**. Answers at `0x5a`, reads plausible temperatures — see §1 |
+| BME280 | 2026-10-06 | 2026-10-13 | 2026-10-28 | Amazon, incl. jumper wires. Answers at `0x76`, chip ID `0x60` = **genuine BME280** — see §2 |
 | USB-C power supply | | by 2026-10-27 | 2026-10-27 | `throttled=0x0` — see §0. On a dual-port charger use one port only: the two ports share 3 A |
 | microSD | | by 2026-10-27 | 2026-10-27 | Patriot LX 16 GB. Standard card: logging writes ~13 MB/day, so a high-endurance card isn't needed |
 | USB-C microSD reader | | 2026-10-27 | 2026-10-27 | Only needed to flash the card from a Mac without an SD slot |
-| Breadboard + jumper wires | | | | Wiring planned for 2026-10-27 evening |
+| Breadboard + jumper wires | | by 2026-10-28 | 2026-10-28 | All three sensors wired on one I2C bus — wiring table in §1 |
 | DS3231 RTC | to be ordered | | | Until fitted, the Pi gets real time from NTP only, so it must boot on a network with internet |
 
-## Known gap: M2 "both sensors electrically alive" not met (2026-10-27)
+## M2 "both sensors electrically alive": met 2026-10-28
 
-At the M2 deadline (2026-10-28) neither kit is wired, so §1–5 below hold no evidence yet, and every
-value marked (a) in `DESIGN.md` is a datasheet assumption, not a measurement. **Plan:** wire
-`darksky.local` and run §1–5 **by 2026-11-03**, paste the raw output here, then correct `DESIGN.md`
-from it. Nothing in this log may be filled in from memory or a description: only tool output.
+On 2026-10-27 this was recorded as a known gap (neither kit wired, target 2026-11-03). On
+2026-10-28, before the M2 submission, Nick wired all three sensors on `darksky.local` and §1–2
+below were run over SSH; the output is pasted as it came back. §3–5 are still to do, and every value
+marked (a) in `DESIGN.md` is still a datasheet assumption until they are. Nothing in this log may be
+filled in from memory or a description: only tool output.
 
 ## 0. Pi setup (2026-10-27, headless — no monitor or keyboard)
 
@@ -94,12 +95,48 @@ The one 1,024-byte allocation is glibc's stdout buffer for `printf`, not project
 
 Expect 0x29 (TSL2591), 0x5A (MLX90614), 0x76 or 0x77 (BME280), 0x68 (DS3231 once fitted).
 
+Wiring (2026-10-28, `darksky.local`, Pi unplugged while wiring). All three sensors share one bus:
+
+| Pi pin | Breadboard | Sensors connected there |
+|---|---|---|
+| 1 (3.3 V) | + strip | TSL2591 VIN, MLX90614 VIN, BME280 VCC, **BME280 CSB** (CSB high = I2C mode) |
+| 6 (GND) | − strip | all three GND, **BME280 SDO** (SDO low = address `0x76`) |
+| 3 (SDA) | column 28 | all three SDA |
+| 5 (SCL) | column 30 | all three SCL |
+| — | — | TSL2591 INT and 3Vo left unconnected |
+
+Pins 2 and 4 (5 V) are not used: the Pi's GPIO is not 5 V tolerant.
+
 ```
-$ i2cdetect -y 1
-(paste output)
+$ i2cdetect -y 1          # run as /usr/sbin/i2cdetect: non-interactive SSH has no /usr/sbin on PATH
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:                         -- -- -- -- -- -- -- --
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+20: -- -- -- -- -- -- -- -- -- 29 -- -- -- -- -- --
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+50: -- -- -- -- -- -- -- -- -- -- 5a -- -- -- -- --
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+70: -- -- -- -- -- -- 76 --
+$ vcgencmd get_throttled
+throttled=0x0
 ```
 
-**Result:**
+First identity checks and readings (indoors, sensors lying flat on the breadboard, facing up):
+
+```
+TSL2591 ID     (0x29 reg 0x12, command byte 0xB2):  0x50
+MLX90614 Ta raw (0x5a RAM 0x06): 0x3905  = 18.79 C      # raw x 0.02 - 273.15
+MLX90614 To raw (0x5a RAM 0x07): 0x3920  = 19.33 C
+TSL2591 powered on (ENABLE=0x03, default gain/100 ms): CH0 full=32  CH1 IR=9
+TSL2591 powered back off (ENABLE=0x00)
+```
+
+**Result:** all three sensors answer at their expected addresses (`0x29`, `0x5a`, `0x76`), with the
+power still clean. The TSL2591 returns its correct ID. The MLX90614's object and ambient readings are
+within 0.6 °C of each other, as expected for an indoor surface at room temperature. The TSL2591
+returns live counts after power-on. These are bring-up checks with `i2c-tools`, not project code:
+the MLX90614 reads were SMBus read-word without checking its PEC byte.
 
 ## 2. BME280 chip ID — is it genuine?
 
@@ -107,10 +144,11 @@ $ i2cdetect -y 1
 
 ```
 $ i2cget -y 1 0x76 0xD0
-(paste output)
+0x60
 ```
 
-**Result:**
+**Result:** `0x60` — a **genuine BME280**, with the humidity sensor the cloud correction needs. No
+return needed.
 
 ## 3. MLX90614 sky vs. indoor wall
 

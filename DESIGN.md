@@ -1,8 +1,8 @@
 # Design Document (M2)
 
 > **M2, 2026-10-27: drafted by Liam (Nick unavailable); the decisions in Nick's area were confirmed by Nick on 2026-10-28.**
-> **(a)** = **assumed (datasheet), verify at bring-up**: no sensor is wired yet, so nothing here
-> is measured.
+> **(a)** = **assumed (datasheet), not yet measured.** The sensors are wired and identified (2026-10-28,
+> hardware-log §1–2), but no performance number here is measured yet.
 
 ## Architecture
 
@@ -112,13 +112,14 @@ Decided, not yet built, except parts marked *implemented*; details in [`docs/rec
 |------------|-------------------------------------------|------------------------------------------|
 | Brightness | calibrated SQM → TSL2591, no reference | **relative to the site baseline**, never absolute mag/arcsec² |
 | Cloud | commercial sensor → MLX90614 + BME280, own humidity fit | if humid-clear and overcast don't separate, the claim narrows to dry nights |
-| Hardware | Adafruit, 2 GB Pi, endurance card, DS3231, enclosure → clones, 1 GB Pi 4, standard 16 GB, no RTC (to be ordered), no enclosure | BME280 may be a BMP280 (hardware-log §2); MLX FOV unknown; offline reboot → UNKNOWN until network time; no outdoor runs; Pi, card fine (a) |
+| Hardware | Adafruit, 2 GB Pi, endurance card, DS3231, enclosure → clones, 1 GB Pi 4, standard 16 GB, no RTC (to be ordered), no enclosure | BME280 verified genuine (chip ID `0x60`); MLX FOV unknown; offline reboot → UNKNOWN until network time; no outdoor runs; Pi, card fine (a) |
 | Kits | one → two: `darksky.local` (Nick), `starlight.local` (Liam) | soak, demo, all evaluation numbers **only from `darksky.local`**; kit differences in hardware log |
 | User, truth | named astronomer, months of labels → archetype; obs. log + `SYNTHETIC` provoked data | requirements from PROBLEM.md; counts, not %, on small n |
 | Budget | $50–80 per team (spec §17) → Nick ≈ $68 (Pi $35 + sensors ≈ $33), Liam $77 (Pi $45 + sensors $32): **team ≈ $145** | **≈ $65 over the guideline's top (≈ 1.8×)**, before unrecorded PSUs, SD cards, RTC, enclosure; each kit alone is within it |
 
-**Known gap (2026-10-27): "both sensors electrically alive" is not met** (no kit wired). Plan:
-run hardware-log §1–5 on `darksky.local` by 2026-11-03; correct the (a) values from evidence.
+**"Both sensors electrically alive": met 2026-10-28** on `darksky.local`. All three answer at
+`0x29`/`0x5a`/`0x76`; BME280 ID `0x60`, TSL2591 ID `0x50`; first live readings (hardware-log §1–2).
+Still to do: §3–5 (sky vs. wall, window material, dark offset); then correct the (a) values.
 
 ## Evaluation plan
 

@@ -9,7 +9,8 @@ Prof. Shrideep Pallickara.
 
 > **Status: M2.** **Dark Sky Monitor.** `DESIGN.md` drafted 2026-10-27; decisions in Nick's area
 > confirmed 2026-10-28. Two kits: `darksky.local` (device of record) and `starlight.local`
-> (development). **Sensors not yet wired**; bring-up target 2026-11-03 (`docs/hardware-log.md`).
+> (development). **All three sensors wired and answering** on `darksky.local` (2026-10-28,
+> `docs/hardware-log.md` §1–2).
 > Where we left off: `docs/progress-log.md`.
 
 ## What this will be
