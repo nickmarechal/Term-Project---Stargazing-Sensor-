@@ -550,6 +550,43 @@ static void test_sync_on_broken_handle(void)
     check_records(1);
 }
 
+/* store_open() fsyncs the file's directory: a new file's name lives there,
+ * and a power cut before the directory reaches the card loses the whole
+ * file. To see that the directory really is opened and synced, take away
+ * read permission on it: the file can still be created (write and search
+ * are enough), but the directory can't be opened for fsync, and store_open
+ * must say so instead of carrying on. Root ignores permissions, so this
+ * can't be checked as root. */
+static void test_dir_fsync_failure_reported(void)
+{
+    if (geteuid() == 0) {
+        printf("  skip test_dir_fsync_failure_reported: running as root\n");
+        return;
+    }
+    char sub[320], p[340];
+    snprintf(sub, sizeof sub, "%s/noread", dir);
+    snprintf(p, sizeof p, "%s/store.dsm", sub);
+    if (mkdir(sub, 0300) != 0) {
+        CHECK(0, "mkdir(%s) failed", sub);
+        return;
+    }
+
+    struct dsm_store *s = NULL;
+    errno = 0;
+    enum store_status st = store_open(p, &s);
+    int e = errno;
+    CHECK(st == STORE_ERR_IO, "open in an unreadable directory returned %d, want IO", st);
+    CHECK(e == EACCES, "errno %d, want EACCES", e);
+    CHECK(s == NULL, "got a store handle anyway");
+    store_close(s);
+
+    chmod(sub, 0700);
+    CHECK(store_open(p, &s) == STORE_OK, "open failed once the directory was readable");
+    store_close(s);
+    unlink(p);
+    rmdir(sub);
+}
+
 void test_store(void)
 {
     /* Not mkdtemp(): macOS hides it under -D_POSIX_C_SOURCE. The process
@@ -578,6 +615,7 @@ void test_store(void)
     test_recover_idempotent();
     test_counters();
     test_sync_on_broken_handle();
+    test_dir_fsync_failure_reported();
 
     unlink(path);
     rmdir(dir);

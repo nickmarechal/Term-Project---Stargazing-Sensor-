@@ -24,6 +24,11 @@ COMMON_HDR  := src/common/crc32.h src/common/record.h src/common/log.h
 STORE_SRC  := src/store/store.c
 STORE_TSRC := tests/test_store.c
 STORE_HDR  := src/store/store.h
+# Linux only (SOCK_SEQPACKET). Sensor programs link STORE_CLIENT_SRC.
+STORE_CLIENT_SRC := src/store/store_client.c
+STORE_CLIENT_HDR := src/store/store_client.h
+STORED_SRC       := src/store/stored.c
+STORE_ITSRC      := tests/itest_stored.c
 
 # --- sensor side (src/sensors; portable parts only) ---
 SENSOR_SRC  := src/sensors/convert.c
@@ -36,27 +41,57 @@ HDR  := tests/check.h tests/suites.h $(COMMON_HDR) $(STORE_HDR) $(SENSOR_HDR)
 
 TESTBIN := build/test_all
 
-## all: build the test binary
-all: $(TESTBIN)
+# Programs that need Linux: built, run under asan and valgrind only there.
+UNAME := $(shell uname -s)
+ifeq ($(UNAME),Linux)
+LINUX_BIN  := build/stored build/itest_stored
+LINUX_TEST := itest
+endif
+
+## all: build the test binary (and stored + its integration test on Linux)
+all: $(TESTBIN) $(LINUX_BIN)
 
 $(TESTBIN): $(SRC) $(TSRC) $(HDR)
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(SRC) $(TSRC) -o $@
 
+build/stored: $(STORED_SRC) $(COMMON_SRC) $(STORE_SRC) $(COMMON_HDR) $(STORE_HDR)
+	@mkdir -p build
+	$(CC) $(CFLAGS) $(STORED_SRC) $(COMMON_SRC) $(STORE_SRC) -o $@
+
+build/itest_stored: $(STORE_ITSRC) $(STORE_CLIENT_SRC) $(COMMON_SRC) $(COMMON_HDR) \
+                    $(STORE_HDR) $(STORE_CLIENT_HDR) tests/check.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) $(STORE_ITSRC) $(STORE_CLIENT_SRC) $(COMMON_SRC) -o $@
+
 ## test: run every test suite
 test: $(TESTBIN)
 	./$(TESTBIN)
 
-## asan: rebuild with AddressSanitizer + UBSan and run the tests
-asan: CFLAGS += $(SANFLAGS)
-asan: clean test
+## itest: run the real stored and talk to it over its socket (Linux only)
+ifeq ($(UNAME),Linux)
+itest: build/stored build/itest_stored
+	./build/itest_stored ./build/stored
+else
+itest:
+	@echo "make itest: needs Linux (macOS has no SOCK_SEQPACKET) - run this on the Pi."
+endif
 
-## memcheck: run the tests under valgrind (Linux/Pi only, not on macOS)
+## asan: rebuild with AddressSanitizer + UBSan and run the tests (and itest on Linux)
+asan: CFLAGS += $(SANFLAGS)
+asan: clean test $(LINUX_TEST)
+
+## memcheck: run the tests (and itest, with stored traced too) under valgrind (Linux/Pi only)
 memcheck: all
 	@if ! command -v valgrind >/dev/null 2>&1; then \
 	    echo "make memcheck: valgrind not installed here (expected on macOS - run this on the Pi)."; \
 	  else \
-	    valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=1 ./$(TESTBIN); \
+	    valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=1 ./$(TESTBIN) && \
+	    if [ -n "$(LINUX_BIN)" ]; then \
+	      valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=1 \
+	        --trace-children=yes --child-silent-after-fork=yes \
+	        ./build/itest_stored ./build/stored; \
+	    fi; \
 	  fi
 
 ## soakcheck: 1-hour miniature of the graded 48h soak
@@ -81,4 +116,4 @@ clean:
 help:
 	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/^## /  /'
 
-.PHONY: all test asan memcheck soakcheck deploy clean help
+.PHONY: all test itest asan memcheck soakcheck deploy clean help

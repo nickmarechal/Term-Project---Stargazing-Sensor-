@@ -114,6 +114,36 @@ static enum store_status recover(int fd, off_t size, struct store_recovery *out)
     return STORE_OK;
 }
 
+/* A file's name lives in its directory, and fsync on the file does not
+ * save the directory. Until the directory is synced, a power cut can lose
+ * the name of a new file, and with it every record in it. */
+static enum store_status sync_parent_dir(const char *path)
+{
+    const char *slash = strrchr(path, '/');
+    char *dir;
+    if (slash == NULL)
+        dir = strdup(".");
+    else if (slash == path)
+        dir = strdup("/");
+    else
+        dir = strndup(path, (size_t)(slash - path));
+    if (dir == NULL)
+        return STORE_ERR_IO;   /* errno is ENOMEM */
+
+    int fd = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    int saved_errno = errno;
+    free(dir);
+    if (fd < 0) {
+        errno = saved_errno;
+        return STORE_ERR_IO;
+    }
+    int rc = fsync(fd);
+    saved_errno = errno;
+    close(fd);
+    errno = saved_errno;
+    return rc == 0 ? STORE_OK : STORE_ERR_IO;
+}
+
 enum store_status store_open(const char *path, struct dsm_store **out)
 {
     enum store_status st;
@@ -141,11 +171,18 @@ enum store_status store_open(const char *path, struct dsm_store **out)
      * and only then is it safe to cut anything off its end. */
     if (sb.st_size == 0) {
         st = write_header(fd);
+        if (st == STORE_OK && fsync(fd) != 0)
+            st = STORE_ERR_IO;
     } else {
         st = check_header(fd, sb.st_size);
         if (st == STORE_OK)
             st = recover(fd, sb.st_size, &rec);
     }
+    /* On every open, not just when the file was new: a crash between
+     * creating the file and this sync leaves a file that looks old next
+     * time, and its name would still not be on the card. */
+    if (st == STORE_OK)
+        st = sync_parent_dir(path);
     if (st != STORE_OK)
         goto fail;
 
