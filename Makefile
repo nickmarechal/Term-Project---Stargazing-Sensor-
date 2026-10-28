@@ -10,11 +10,26 @@ CFLAGS := -std=c17 -Wall -Wextra -Werror -g -O1 -Isrc -Itests \
           -D_POSIX_C_SOURCE=200809L
 SANFLAGS := -fsanitize=address,undefined -fno-omit-frame-pointer
 
-# Library code (no main). Each step adds its files here.
-SRC  := src/common/crc32.c src/common/record.c src/store/store.c
-TSRC := tests/test_main.c tests/test_crc32.c tests/test_record.c tests/test_store.c
-HDR  := tests/check.h tests/suites.h src/common/crc32.h src/common/record.h \
-        src/store/store.h
+# Portable library code (no main), built and tested on macOS and Linux.
+# Each side adds files only to its own section (docs/m3-plan.md).
+
+# --- shared (src/common) ---
+COMMON_SRC := src/common/crc32.c src/common/record.c
+COMMON_HDR := src/common/crc32.h src/common/record.h
+
+# --- storage side (src/store, src/dsq) ---
+STORE_SRC  := src/store/store.c
+STORE_TSRC := tests/test_store.c
+STORE_HDR  := src/store/store.h
+
+# --- sensor side (src/sensors; portable parts only) ---
+SENSOR_SRC  :=
+SENSOR_TSRC :=
+SENSOR_HDR  :=
+
+SRC  := $(COMMON_SRC) $(STORE_SRC) $(SENSOR_SRC)
+TSRC := tests/test_main.c tests/test_crc32.c tests/test_record.c $(STORE_TSRC) $(SENSOR_TSRC)
+HDR  := tests/check.h tests/suites.h $(COMMON_HDR) $(STORE_HDR) $(SENSOR_HDR)
 
 TESTBIN := build/test_all
 

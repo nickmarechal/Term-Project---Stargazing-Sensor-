@@ -34,9 +34,9 @@ and is not required to work in this repo.)
   the 2026-10-27 M2 entry of [`docs/progress-log.md`](docs/progress-log.md)) were confirmed by
   Nick on 2026-10-28. Values marked (a) are datasheet assumptions,
   not measurements. Record, IPC and supervision detail: [`docs/record-and-ipc.md`](docs/record-and-ipc.md).
-- **Next action:** finish hardware-log §3–5 on `darksky.local` (§1–2 done 2026-10-28, which met
-  M2's "both sensors electrically alive"). Step 4 (acrylic vs. LDPE film in front of the MLX90614) tests
-  the largest hardware unknown in the project.
+- **Next action: M3, per [`docs/m3-plan.md`](docs/m3-plan.md)** (Canvas closes Fri 2026-10-30,
+  8 pm MT). It says who does what, the interface between the storage and sensor sides, and the
+  steps for each. Hardware-log §3–5 on `darksky.local` are still open after that.
 - **Open gap:** the problem memo names an archetype, not a named individual. Outreach to the
   Northern Colorado Astronomical Society / CSU astronomy faculty still pending.
 
@@ -80,14 +80,22 @@ Ownership means **first authorship and answerability at the defense**, not exclu
 partner is individually examined on their own subsystems plus one question from across the
 boundary.
 
-- **Nick:** `src/common/` (record format + CRC — owned by storage, used by everyone) and
-  `src/store/` — mechanism **D**, the crash-consistent storage layer.
-- **Liam (confirmed by Liam 2026-10-27):** `src/super/`, `src/sensors/`, and the IPC — mechanism
-  **E**: the supervisor (`dskyd`), the sensor daemons, the shm rings, sockets and pipes, and
-  `fusiond`'s ring-draining loop. All Linux-only I2C code lives in `src/sensors/`, so everything
-  else builds and tests on a Mac.
-- **Analysis and query CLI (proposed by Liam, confirmed by Nick 2026-10-28):** Liam: classifier +
-  state machine. Nick: features, ephemeris, and the `dsq` query CLI.
+**Changed for M3 on a call, 2026-10-28 (both agreed):** sensors moved to Nick, because only
+`darksky.local` is wired; the storage side from M3 on moved to Liam, because `stored`'s socket
+runs only on Linux, which is what Liam develops on. Details: [`docs/m3-plan.md`](docs/m3-plan.md).
+
+- **Nick:** `src/common/` (record format, CRC, logger) and the store library through crash
+  recovery (`src/store/store.{c,h}` up to `bc6d3bc`); **`src/sensors/`** (I2C layer, conversion
+  math, `sensorcheck`, `skyd`, `cloudd`, `envd`); the header `src/store/store_client.h` (the
+  interface between the two sides). Analysis: features, ephemeris, and `dsq`'s query commands.
+- **Liam:** **`src/store/` from M3 on** (`fsync`, counters, read-only scan, batching, `stored`,
+  `store_client.c`), **`dsq dump`** (`src/dsq/`), `tests/itest_stored.c`; then mechanism **E** at
+  M4: `src/super/` (`dskyd`), the shm rings, `fusiond`'s ring-draining loop. Analysis:
+  classifier + state machine.
+- Mechanism **D** is shared: the format and recovery are Nick's, the daemon that runs them is
+  Liam's. Each answers for his own part at the defense.
+- **Linux-only code:** `src/sensors/` I2C and daemons (`<linux/i2c-dev.h>`), `stored` and
+  `store_client` (`SOCK_SEQPACKET` fails on macOS). Everything else builds and tests on a Mac.
 - The agent edits outside the current session owner's area only when told explicitly whose
   session this is.
 

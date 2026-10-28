@@ -9,6 +9,36 @@ verified, and what it leaves open.
 
 ---
 
+## 2026-10-28 — M3 started: crash recovery done; work split agreed (Nick)
+
+- **Canvas "TP-D2" grades M2 and M3** (10 pts each; closes Fri 2026-10-30, 8 pm MT). M2 is met.
+  M3 is not yet: nothing in the repo moves sensor data into storage.
+- **Crash recovery is in** (`bc6d3bc`): `store_open()` on an existing file checks the header,
+  then walks the records and cuts the file off at the first short or CRC-bad one (`ftruncate`,
+  then `fsync` so the cut is durable). `store_get_recovery()` reports `kept` and `cut_bytes`.
+  This closes "reopen appends after a partial record, out of line" from the 2026-10-27 entry.
+  - Verified on macOS: `make test` 259 checks, 0 failed; `make asan` 259, 0 failed.
+  - Six new tests: torn tail, corrupt middle record, zero-filled slot, clean file unchanged
+    byte for byte, header-only file, recovery twice = once.
+  - Mutation check: 5 of 5 deliberate breaks caught (no CRC check, off-by-one, never truncate,
+    recovering a foreign file, wrong `cut_bytes`). Not provable by a unit test: that a failed
+    `pread` cuts nothing, and that the `fsync` happens. The plug-pull test covers the latter.
+- **Agreed on a call (Nick, Liam): the M3 work is split by side.** Liam: the storage side
+  (`fsync`, counters, read-only scan, `stored`, `store_client.c`, `make itest`, `dsq dump`).
+  Nick: the sensor side (conversion math, I2C layer, `skyd`, `cloudd`, `envd`), because only
+  `darksky.local` is wired, and the integration run on it. `CLAUDE.md`'s ownership map is updated.
+- **Decisions:** M3 slice = sensors → `stored` directly; `SOCK_SEQPACKET` kept as designed, which
+  runs on Linux only (macOS: "Protocol not supported", checked); mechanism D is the one shown
+  working at M3.
+- **The M3 plan, the interface between the two sides, and each side's steps:
+  [`m3-plan.md`](m3-plan.md). Read it before starting M3 work.**
+- Makefile split into a storage section and a sensor section so each side edits only its own
+  lines.
+- **Open:** the shared pieces (`record.h` additions, `log.{c,h}`, `store_client.h`) land next,
+  from Nick. Storage steps S1 and S2 don't need them.
+
+---
+
 ## 2026-10-28 — Pulled Nick's bring-up; status check (Liam)
 
 - Pulled `2deadc7`, `022d55d`, `b527bf2`. No code changed (`src/`, `tests/`, `Makefile`
