@@ -7,6 +7,27 @@ it has never met and be wrong in ways only an instrument catches: never accept a
 problem that was diagnosed from a verbal description. `dmesg`, `i2cdetect`, timing captures,
 `/proc/interrupts` — paste the actual bytes.
 
+## Device of record
+
+Each partner has a kit for parallel development: **`darksky.local`** (Nick's Pi 4 1 GB + sensors)
+and **`starlight.local`** (Liam's dev Pi + TSL2591, MLX90614, BME280). **Numbers are reported
+only from the device of record, `darksky.local`:** the soak, the demo, and every number in
+`EVALUATION.md`. Output from `starlight.local` may be logged here for debugging, always labeled
+with its hostname. Differences in parts between the kits (breakout vendor or revision, BME280
+chip ID, MLX90614 part suffix, I2C addresses) are logged under "Kit differences" as they are
+found.
+
+| Bring-up step (sections below) | `darksky.local` (device of record) | `starlight.local` (dev only) |
+|---|---|---|
+| §0 Pi set up: SSH, I2C on, `get_throttled` | done 2026-10-27 | |
+| §1 `i2cdetect -y 1` | | |
+| §2 BME280 chip ID | | |
+| §3 MLX90614 sky vs. wall | | |
+| §4 window material | | |
+| §5 TSL2591 dark offset | | |
+
+**Kit differences:** none recorded yet. Neither kit is wired (2026-10-27).
+
 ## Status
 
 | Item | Ordered | Arrived | Verified | Notes |
@@ -19,7 +40,14 @@ problem that was diagnosed from a verbal description. `dmesg`, `i2cdetect`, timi
 | microSD | | by 2026-10-27 | 2026-10-27 | Patriot LX 16 GB. Standard card: logging writes ~13 MB/day, so a high-endurance card isn't needed |
 | USB-C microSD reader | | 2026-10-27 | 2026-10-27 | Only needed to flash the card from a Mac without an SD slot |
 | Breadboard + jumper wires | | | | Wiring planned for 2026-10-27 evening |
-| DS3231 RTC | | | | **not ordered** — deferred. Until fitted, the Pi gets real time from NTP only, so it must boot on a network with internet |
+| DS3231 RTC | 2026-10-27 (Liam) | | | Until fitted, the Pi gets real time from NTP only, so it must boot on a network with internet |
+
+## Known gap: M2 "both sensors electrically alive" not met (2026-10-27)
+
+At the M2 deadline (2026-10-28) neither kit is wired, so §1–5 below hold no evidence yet, and every
+value marked (a) in `DESIGN.md` is a datasheet assumption, not a measurement. **Plan:** wire
+`darksky.local` and run §1–5 **by 2026-11-03**, paste the raw output here, then correct `DESIGN.md`
+from it. Nothing in this log may be filled in from memory or a description: only tool output.
 
 ## 0. Pi setup (2026-10-27, headless — no monitor or keyboard)
 

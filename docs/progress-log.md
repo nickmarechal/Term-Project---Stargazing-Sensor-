@@ -9,6 +9,101 @@ verified, and what it leaves open.
 
 ---
 
+## 2026-10-27 (evening) — M2 design document written (Liam)
+
+Nick was unavailable, so Liam wrote `DESIGN.md` alone for the M2 deadline (2026-10-28, Canvas
+date). The course handout was read in full and is kept locally only (`docs/CS370-TermProject.pdf`,
+git-ignored).
+
+### What changed
+
+| Commit | What |
+|---|---|
+| `f85b220` | `.gitignore` the handout PDF |
+| `4a75922` | DESIGN: architecture diagram with a rate on every arrow |
+| `4deb2f6` | DESIGN: mechanism mapping. E: R-E1 (UNKNOWN within 60 s), R-E2 (≤ 10 s lost per crash). D: R-D1 (≤ 60 s lost per power cut), R-D2 (20/20 recoveries), R-D3 (≥ 180 days on 16 GB) |
+| `584ac8b` | DESIGN: failure-mode table (13 rows, each with how to inject it) and storage |
+| `32a55e8` | New [`record-and-ipc.md`](record-and-ipc.md): record layout, payloads, rate derivation, ring invariants, channels, supervision rules |
+| `9fa7f0b` | DESIGN: constraints and evaluation plan (14 rows, each with a numeric target) |
+| `b053730` | DESIGN: ownership, AI-use plan, trimmed to 5 pages |
+| this commit | `CLAUDE.md`, hardware log, this entry |
+
+### How it was verified
+
+- On a CS department Linux machine (x86-64, gcc 16.1.0), **not the Pi**: `make` exit 0;
+  `make test` 116 checks, 0 failed; `make asan` 116 checks, 0 failed; `make clean && make
+  memcheck` 0 errors, no leaks.
+- `DESIGN.md` is 5 pages rendered by pandoc → PDF (xelatex, 11 pt, 1-inch margins, US letter).
+  The handout sets no format; this is the measure we used.
+- `grep -rnE 'AF_INET|PF_INET|getaddrinfo|gethostbyname|curl|https?://' src/` prints nothing.
+
+### Decisions marked "proposed (Liam), Nick to confirm" (‡ in DESIGN.md)
+
+1. **Hub → storage:** `AF_UNIX SOCK_SEQPACKET`, one record per message. `stored` accepts
+   `fusiond` and `dskyd` and stays the only writer. While `stored` is down, `fusiond` buffers 4096
+   records (≈ 50 min), then drops the oldest and counts.
+2. **Durability:** `write()` every 10 s or 64 records; `fsync()` every 60 s, at rotation and at
+   shutdown; directory `fsync()` after creating a segment.
+3. **Segments:** one per night, rotated at local noon (every 24 h of monotonic time when the clock
+   is unsynced), 32 MB cap. No MANIFEST: recovery scans only the open segment.
+4. **Retention:** raw 180 days, rollups forever; raw writes stop below 2 GB free.
+5. **Torn header:** a 1–23-byte file with our segment name in our data directory is recreated; any
+   other short file is still refused.
+6. **`seq` per (source, run):** a new kind START (= 6) opens every run, carrying the run number
+   from `dskyd`.
+7. **Failures in records:** an I/O failure is a FAULT (the first, then ≤ 1 per 60 s); an
+   implausible value is a SAMPLE without `VALID`.
+8. **`source_id`s:** 0 reserved, 1 `skyd`, 2 `cloudd`, 3 `envd`, 4 `fusiond`, 5 `dskyd`,
+   6 `stored`.
+9. **Payloads:** Nick's SAMPLE table adopted as is; FEATURE, STATE, HEARTBEAT, FAULT and START
+   added; new flag `CLOCK_UNSYNC` = bit 4. No layout change. See `record-and-ipc.md`.
+10. **Analysis split:** Liam takes the classifier + state machine; Nick takes features,
+    ephemeris and `dsq`.
+11. **Evaluation targets in Nick's area:** row 2 (durable p99 ≤ 61 s), 10 (`fsync` sweep, ≤ 30
+    MB/day written at 60 s), 11 (power cut 20/20, ≤ 60 s lost), 12 (ephemeris ≤ 0.1° sun, ≤ 0.5°
+    moon).
+
+### Decided in Liam's area (mechanism E)
+
+Three sensor daemons share the bus; an I2C broker is the fallback if p99 interval jitter > 100 ms.
+Shared-memory single-producer/single-consumer rings, chosen for decoupled lifetimes. One thread
+per process. A hang is detected after 20 s of a silent liveness pipe. A "sensor absent" exit code
+→ `DEAD` + re-probe every 60 s. Crash backoff 1 → 60 s; 5 crashes in 300 s → `DEAD`. systemd
+supervises `dskyd`; children use `PR_SET_PDEATHSIG`. Hourly heartbeat; stderr → journald. No IP
+sockets. With no RTC: `CLOCK_UNSYNC` flag and an UNKNOWN verdict.
+
+### Hardware
+
+- **Two kits.** `darksky.local` (Nick) is the device of record: soak, demo and every evaluation
+  number. `starlight.local` (Liam: Pi $45 + sensors $32 = $77) is for development only. Team
+  ≈ $145 against the handout's $50–80 guideline, before the unrecorded PSUs, SD cards, RTC and
+  enclosure.
+- DS3231 ordered 2026-10-27 (Liam).
+- **No sensor wired on either kit.** "Both sensors electrically alive" was not met for M2; target
+  2026-11-03 for hardware-log §1–5 on `darksky.local`.
+
+### Open
+
+- **Nick:** confirm or change items 1–11 above, then review the DESIGN.md diffs (that review is
+  the PROMPTLOG cross-review episode).
+- **Liam:** write up a review of Nick's `src/store/` and `src/common/` in `PROMPTLOG-liam.md`.
+  Findings so far: a 1–23-byte file is refused forever (item 5 addresses it), no directory
+  `fsync` after create, and `seq` resets on restart (item 6 addresses it).
+- **Both:** copy out M2 transcripts to `transcripts/<name>/2026-10-27-m2/`.
+- **Makefile bug, not fixed:** `make memcheck` straight after `make asan` runs valgrind on the
+  ASan binary and crashes. Run `make clean` first. `vgcore.*` is also missing from `.gitignore`.
+- **Docs that still contradict the design:**
+  - README says the Pi isn't ordered and the project is at M0.
+  - The BOM's Decisions section says Pi 4 2 GB, "buy Adafruit" and a 32 GB high-endurance card;
+    we have 1 GB, clones and a standard 16 GB card. It also argues for both a narrow and a wide
+    field of view.
+  - `design-review.md` says the project can't work without an RTC.
+  - `transcripts/README.md` names `liam/2026-09-23-m1/`; the folder is `m0-m1`.
+- **Prices not recorded:** PSUs, SD cards, card reader (both kits).
+- **Commits after this one:** 26 in total, Liam 9 (≈ 35 %).
+
+---
+
 ## 2026-10-27 — Pi set up; storage writer done (Nick)
 
 ### Milestone position

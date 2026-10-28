@@ -19,17 +19,24 @@ and is not required to work in this repo.)
 - **Where we left off: [`docs/progress-log.md`](docs/progress-log.md). Read it first.** Newest
   entry on top: milestone position, what code exists and what it guarantees, the shared record
   contract, and the open work. Add an entry there when you finish a chunk of work.
-- **Hardware: ARRIVED 2026-10-13** — Pi 4 Model B **1 GB** + TSL2591 + MLX90614 (**3.3 V** variant)
-  + BME280. See [`docs/bill-of-materials.md`](docs/bill-of-materials.md). Pi set up headless
-  2026-10-27 (`darksky.local`, I2C on, power `0x0`); **sensors not wired yet.** DS3231 RTC and
-  enclosure still unbought; until the RTC exists the Pi takes real time from the network at boot.
+- **Hardware: two kits.** **`darksky.local`** (Nick: Pi 4 Model B **1 GB** + TSL2591 + MLX90614
+  **3.3 V** + BME280; arrived 2026-10-13, set up headless 2026-10-27, I2C on, power `0x0`) is the
+  **device of record**: the soak, the demo and every evaluation number come only from it.
+  **`starlight.local`** (Liam's dev Pi + the same three sensors) is for parallel development only.
+  **No sensors wired on either kit yet.** DS3231 RTC ordered 2026-10-27; until it is fitted the Pi
+  takes real time from the network at boot. Enclosure still unbought. See
+  [`docs/hardware-log.md`](docs/hardware-log.md) and [`docs/bill-of-materials.md`](docs/bill-of-materials.md).
 - **Mechanisms: D** (crash-consistent storage) **+ E** (multiprocess + IPC + supervisor). C and F
   were considered and rejected — at 0.1–1 Hz sampling neither is justified, and being able to say
   why is a stronger defense answer than bolting them on.
-- **Next action:** wire the sensors and run the bring-up checklist in
-  [`docs/hardware-log.md`](docs/hardware-log.md) (M2: "both sensors electrically alive"). Step 4
-  (acrylic vs. LDPE film in front of the MLX90614) tests the largest hardware unknown in the
-  project. `DESIGN.md` (M2) is still unwritten.
+- **Design: `DESIGN.md` M2 draft written 2026-10-27 (Liam).** Every decision in Nick's area is
+  marked ‡ "proposed (Liam), Nick to confirm"; the list is in the 2026-10-27 M2 entry of
+  [`docs/progress-log.md`](docs/progress-log.md). Values marked (a) are datasheet assumptions,
+  not measurements. Record, IPC and supervision detail: [`docs/record-and-ipc.md`](docs/record-and-ipc.md).
+- **Next action:** wire `darksky.local` and run hardware-log §1–5 **by 2026-11-03**. M2's
+  "both sensors electrically alive" was **not met** at the deadline (a dated known gap in
+  DESIGN.md and the hardware log). Step 4 (acrylic vs. LDPE film in front of the MLX90614) tests
+  the largest hardware unknown in the project.
 - **Open gap:** the problem memo names an archetype, not a named individual. Outreach to the
   Northern Colorado Astronomical Society / CSU astronomy faculty still pending.
 
@@ -75,11 +82,14 @@ boundary.
 
 - **Nick:** `src/common/` (record format + CRC — owned by storage, used by everyone) and
   `src/store/` — mechanism **D**, the crash-consistent storage layer.
-- **Liam (proposed — Liam to confirm):** `src/super/`, `src/sensors/`, and the IPC — mechanism
-  **E**, the supervisor and the sensor daemons. All Linux-only I2C code lives in `src/sensors/`,
-  so everything else builds and tests on a Mac.
-- **To decide together:** analysis (ephemeris, features, classifier, state machine) and the
-  query CLI.
+- **Liam (confirmed by Liam 2026-10-27):** `src/super/`, `src/sensors/`, and the IPC — mechanism
+  **E**: the supervisor (`dskyd`), the sensor daemons, the shm rings, sockets and pipes, and
+  `fusiond`'s ring-draining loop. All Linux-only I2C code lives in `src/sensors/`, so everything
+  else builds and tests on a Mac.
+- **Analysis and query CLI: proposed (Liam), Nick to confirm.** Liam: classifier + state machine.
+  Nick: features, ephemeris, and the `dsq` query CLI.
+- **Nick's open items:** confirm the analysis split above, and every ‡ decision in `DESIGN.md`
+  (listed in the progress log's M2 entry).
 - The agent edits outside the current session owner's area only when told explicitly whose
   session this is.
 
