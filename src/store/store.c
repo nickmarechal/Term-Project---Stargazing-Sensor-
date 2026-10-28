@@ -81,11 +81,12 @@ static enum store_status check_header(int fd, off_t size)
     return STORE_OK;
 }
 
-/* Find where the good records end, and cut off everything after that.
- * A crash in the middle of a write leaves part of a record, or a block of
- * zeros, at the end of the file. We keep every record up to the first one
- * that is short or fails its CRC, and drop the rest. */
-static enum store_status recover(int fd, off_t size, struct store_recovery *out)
+/* Find where the good records end: every record up to the first one that
+ * is short or fails its CRC. Calls fn (if not NULL) on each good one, in
+ * order. Only reads; recover() and store_scan() both use it, so a scan
+ * always agrees with what recovery would do. */
+static enum store_status walk_records(int fd, off_t size, store_visit_fn fn, void *ctx,
+                                      struct store_recovery *out, off_t *end_out)
 {
     const off_t rec_size = (off_t)sizeof(struct dsm_record);
     off_t end = (off_t)sizeof(struct dsm_store_header);   /* end of the good part */
@@ -98,12 +99,28 @@ static enum store_status recover(int fd, off_t size, struct store_recovery *out)
             return STORE_ERR_IO;   /* a failed read is not a bad record: cut nothing */
         if (n != rec_size || !record_intact(&r))
             break;
+        if (fn != NULL)
+            fn(&r, ctx);
         kept++;
         end += rec_size;
     }
 
     out->kept = kept;
     out->cut_bytes = (uint64_t)(size - end);
+    *end_out = end;
+    return STORE_OK;
+}
+
+/* Find where the good records end, and cut off everything after that.
+ * A crash in the middle of a write leaves part of a record, or a block of
+ * zeros, at the end of the file. We keep every record up to the first one
+ * that is short or fails its CRC, and drop the rest. */
+static enum store_status recover(int fd, off_t size, struct store_recovery *out)
+{
+    off_t end;
+    enum store_status st = walk_records(fd, size, NULL, NULL, out, &end);
+    if (st != STORE_OK)
+        return st;
     if (end == size)
         return STORE_OK;           /* clean: don't touch the file at all */
 
@@ -268,4 +285,35 @@ struct store_recovery store_get_recovery(const struct dsm_store *s)
 struct store_counters store_get_counters(const struct dsm_store *s)
 {
     return s->counters;
+}
+
+enum store_status store_scan(const char *path, store_visit_fn fn, void *ctx,
+                             struct store_recovery *out)
+{
+    enum store_status st;
+    struct stat sb;
+    off_t end;
+    int saved_errno;
+
+    out->kept = 0;
+    out->cut_bytes = 0;
+
+    /* O_RDONLY, so nothing here can change the file, and no O_CREAT, so a
+     * missing file stays missing. */
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0)
+        return STORE_ERR_IO;
+    if (fstat(fd, &sb) != 0) {
+        st = STORE_ERR_IO;
+        goto done;
+    }
+    st = check_header(fd, sb.st_size);
+    if (st == STORE_OK)
+        st = walk_records(fd, sb.st_size, fn, ctx, out, &end);
+
+done:
+    saved_errno = errno;
+    close(fd);
+    errno = saved_errno;
+    return st;
 }

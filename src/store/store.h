@@ -81,4 +81,15 @@ enum store_status store_close(struct dsm_store *s);
 struct store_recovery store_get_recovery(const struct dsm_store *s);
 struct store_counters store_get_counters(const struct dsm_store *s);
 
+typedef void (*store_visit_fn)(const struct dsm_record *r, void *ctx);
+
+/* Read-only: checks the header, then calls fn (if not NULL) on each intact
+ * record in order, stopping at the first short or damaged one, exactly
+ * where recovery would cut. out says what recovery would keep and cut.
+ * It never changes the file, so it is safe while stored is writing: it
+ * reads the file as it was when the scan began, and a record stored is
+ * halfway through writing just shows up as a few tail bytes. */
+enum store_status store_scan(const char *path, store_visit_fn fn, void *ctx,
+                             struct store_recovery *out);
+
 #endif

@@ -22,8 +22,10 @@ COMMON_HDR  := src/common/crc32.h src/common/record.h src/common/log.h
 
 # --- storage side (src/store, src/dsq) ---
 STORE_SRC  := src/store/store.c
-STORE_TSRC := tests/test_store.c
-STORE_HDR  := src/store/store.h
+STORE_TSRC := tests/test_store.c tests/test_dsq.c
+STORE_HDR  := src/store/store.h src/dsq/dump.h
+DSQ_LIB    := src/dsq/dump.c
+DSQ_SRC    := src/dsq/dsq.c
 # Linux only (SOCK_SEQPACKET). Sensor programs link STORE_CLIENT_SRC.
 STORE_CLIENT_SRC := src/store/store_client.c
 STORE_CLIENT_HDR := src/store/store_client.h
@@ -35,7 +37,7 @@ SENSOR_SRC  := src/sensors/convert.c
 SENSOR_TSRC := tests/test_convert.c
 SENSOR_HDR  := src/sensors/convert.h
 
-SRC  := $(COMMON_SRC) $(STORE_SRC) $(SENSOR_SRC)
+SRC  := $(COMMON_SRC) $(STORE_SRC) $(DSQ_LIB) $(SENSOR_SRC)
 TSRC := tests/test_main.c $(COMMON_TSRC) $(STORE_TSRC) $(SENSOR_TSRC)
 HDR  := tests/check.h tests/suites.h $(COMMON_HDR) $(STORE_HDR) $(SENSOR_HDR)
 
@@ -48,12 +50,16 @@ LINUX_BIN  := build/stored build/itest_stored
 LINUX_TEST := itest
 endif
 
-## all: build the test binary (and stored + its integration test on Linux)
-all: $(TESTBIN) $(LINUX_BIN)
+## all: build the test binary and dsq (and stored + its integration test on Linux)
+all: $(TESTBIN) build/dsq $(LINUX_BIN)
 
 $(TESTBIN): $(SRC) $(TSRC) $(HDR)
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(SRC) $(TSRC) -o $@
+
+build/dsq: $(DSQ_SRC) $(DSQ_LIB) $(COMMON_SRC) $(STORE_SRC) $(COMMON_HDR) $(STORE_HDR)
+	@mkdir -p build
+	$(CC) $(CFLAGS) $(DSQ_SRC) $(DSQ_LIB) $(COMMON_SRC) $(STORE_SRC) -o $@
 
 build/stored: $(STORED_SRC) $(COMMON_SRC) $(STORE_SRC) $(COMMON_HDR) $(STORE_HDR)
 	@mkdir -p build

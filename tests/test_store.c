@@ -587,6 +587,93 @@ static void test_dir_fsync_failure_reported(void)
     rmdir(sub);
 }
 
+/* What a scan saw, in order. */
+struct visits {
+    uint32_t n;
+    uint32_t seq[MAX_RECS];
+};
+
+static void visit(const struct dsm_record *r, void *ctx)
+{
+    struct visits *v = ctx;
+    if (v->n < MAX_RECS)
+        v->seq[v->n] = r->seq;
+    v->n++;
+}
+
+/* A scan must report what recovery would do, visit exactly the records
+ * recovery would keep, and leave the file byte for byte as it was, torn
+ * tail included. */
+static void test_scan_matches_recovery(void)
+{
+    make_store(10);
+    unsigned char junk[20];
+    memset(junk, 0xAB, sizeof junk);
+    append_raw(junk, sizeof junk);
+
+    unsigned char before[HDR + 10 * REC + 20], after[HDR + 10 * REC + 20];
+    size_t nb = read_raw(before, sizeof before);
+
+    struct visits v;
+    memset(&v, 0, sizeof v);
+    struct store_recovery got = {99, 99};
+    CHECK(store_scan(path, visit, &v, &got) == STORE_OK, "scan failed");
+    size_t na = read_raw(after, sizeof after);
+    CHECK(na == nb && memcmp(before, after, nb) == 0, "scan changed the file");
+
+    CHECK(got.kept == 10 && got.cut_bytes == 20, "scan: kept %" PRIu64 ", tail %" PRIu64
+          ", want 10 and 20", got.kept, got.cut_bytes);
+    CHECK(v.n == 10, "visited %u records, want 10", v.n);
+    for (uint32_t i = 0; i < v.n && i < MAX_RECS; i++)
+        CHECK(v.seq[i] == i, "visit %u saw seq %u", i, v.seq[i]);
+
+    struct store_recovery rec = reopen();
+    CHECK(rec.kept == got.kept && rec.cut_bytes == got.cut_bytes,
+          "recovery kept %" PRIu64 " cut %" PRIu64 "; scan said %" PRIu64 " and %" PRIu64,
+          rec.kept, rec.cut_bytes, got.kept, got.cut_bytes);
+}
+
+/* A damaged record in the middle: the scan stops there, like recovery. */
+static void test_scan_stops_at_bad_record(void)
+{
+    make_store(10);
+    unsigned char buf[HDR + 10 * REC];
+    size_t n = read_raw(buf, sizeof buf);
+    buf[HDR + 5 * REC + 30] ^= 0x01;
+    write_raw(buf, n);
+
+    struct visits v;
+    memset(&v, 0, sizeof v);
+    struct store_recovery got = {0, 0};
+    CHECK(store_scan(path, visit, &v, &got) == STORE_OK, "scan failed");
+    CHECK(got.kept == 5 && got.cut_bytes == 5 * REC, "scan: kept %" PRIu64 ", tail %" PRIu64,
+          got.kept, got.cut_bytes);
+    CHECK(v.n == 5, "visited %u records, want 5", v.n);
+    CHECK(file_size() == (long)n, "scan changed the file's size");
+}
+
+static void test_scan_refusals(void)
+{
+    struct visits v;
+    memset(&v, 0, sizeof v);
+    struct store_recovery got;
+
+    const char text[] = "somebody's notes file, definitely not ours\n";
+    write_raw(text, sizeof text - 1);
+    CHECK(store_scan(path, visit, &v, &got) == STORE_ERR_FORMAT, "foreign file not refused");
+    CHECK(v.n == 0, "visited records of a foreign file");
+
+    unlink(path);
+    errno = 0;
+    CHECK(store_scan(path, visit, &v, &got) == STORE_ERR_IO && errno == ENOENT,
+          "missing file: not IO/ENOENT");
+    CHECK(file_size() == -1, "scan created the file");
+
+    make_store(3);
+    CHECK(store_scan(path, NULL, NULL, &got) == STORE_OK && got.kept == 3 && got.cut_bytes == 0,
+          "scan with no visitor: kept %" PRIu64 ", tail %" PRIu64, got.kept, got.cut_bytes);
+}
+
 void test_store(void)
 {
     /* Not mkdtemp(): macOS hides it under -D_POSIX_C_SOURCE. The process
@@ -616,6 +703,9 @@ void test_store(void)
     test_counters();
     test_sync_on_broken_handle();
     test_dir_fsync_failure_reported();
+    test_scan_matches_recovery();
+    test_scan_stops_at_bad_record();
+    test_scan_refusals();
 
     unlink(path);
     rmdir(dir);
