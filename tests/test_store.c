@@ -5,6 +5,7 @@
 #include "store/store.h"
 
 #include <errno.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -298,6 +299,161 @@ static void test_failed_write_stops_appends(void)
           "file is %ld bytes, want %d..%d", size, HDR + 2 * REC, HDR + 2 * REC + 10);
 }
 
+/* Add bytes to the end of the test file, the way a crash in the middle of
+ * a write leaves them. */
+static void append_raw(const void *buf, size_t len)
+{
+    FILE *f = fopen(path, "ab");
+    CHECK(f != NULL, "could not open %s", path);
+    if (f == NULL)
+        return;
+    CHECK(fwrite(buf, 1, len, f) == len, "short append to %s", path);
+    fclose(f);
+}
+
+/* A fresh store file holding records 0..n-1. */
+static void make_store(uint32_t n)
+{
+    unlink(path);
+    struct dsm_store *s = NULL;
+    if (store_open(path, &s) != STORE_OK) {
+        CHECK(0, "open failed");
+        return;
+    }
+    struct store_recovery got = store_get_recovery(s);
+    CHECK(got.kept == 0 && got.cut_bytes == 0, "a new file reports recovery");
+    CHECK(append_range(s, 0, n) == 0, "appends failed");
+    store_close(s);
+}
+
+/* Reopen the test file, which runs recovery, and say what it did. */
+static struct store_recovery reopen(void)
+{
+    struct store_recovery got = {0, 0};
+    struct dsm_store *s = NULL;
+    CHECK(store_open(path, &s) == STORE_OK, "reopen failed");
+    if (s != NULL)
+        got = store_get_recovery(s);
+    store_close(s);
+    return got;
+}
+
+/* A power cut in the middle of a write leaves part of a record at the end.
+ * Reopening must cut exactly those bytes, keep every whole record, and put
+ * the next append back on a record boundary. */
+static void test_recover_torn_tail(void)
+{
+    make_store(10);
+    unsigned char junk[20];
+    memset(junk, 0xAB, sizeof junk);
+    append_raw(junk, sizeof junk);
+
+    struct store_recovery got = reopen();
+    CHECK(got.kept == 10, "kept %" PRIu64 ", want 10", got.kept);
+    CHECK(got.cut_bytes == 20, "cut %" PRIu64 " bytes, want 20", got.cut_bytes);
+    CHECK(file_size() == HDR + 10 * REC, "file is %ld bytes", file_size());
+    check_records(10);
+
+    struct dsm_store *s = NULL;
+    if (store_open(path, &s) != STORE_OK) {
+        CHECK(0, "open after recovery failed");
+        return;
+    }
+    CHECK(append_range(s, 10, 12) == 0, "appends after recovery failed");
+    store_close(s);
+    check_records(12);
+}
+
+/* One damaged byte in record 5 of 10. Records 6-9 still pass their own
+ * CRCs, but they are cut too. The store never writes a bad record, so a
+ * bad one in the middle means the file was damaged after it was written,
+ * and we can't tell how far the damage goes. The rule stays simple: keep
+ * everything before the first bad record, nothing after it. */
+static void test_recover_corrupt_middle(void)
+{
+    make_store(10);
+    unsigned char buf[HDR + 10 * REC];
+    size_t n = read_raw(buf, sizeof buf);
+    CHECK(n == sizeof buf, "store file is %zu bytes, want %zu", n, sizeof buf);
+    buf[HDR + 5 * REC + 30] ^= 0x01;   /* inside record 5's values */
+    write_raw(buf, n);
+
+    struct store_recovery got = reopen();
+    CHECK(got.kept == 5, "kept %" PRIu64 ", want 5", got.kept);
+    CHECK(got.cut_bytes == 5 * REC, "cut %" PRIu64 " bytes, want %d",
+          got.cut_bytes, 5 * REC);
+    check_records(5);
+}
+
+/* After a power cut, a file can end in a block of zeros: the file's size
+ * was saved, the data never was. Zeros must never pass as a record. */
+static void test_recover_zero_slot(void)
+{
+    make_store(3);
+    unsigned char zeros[REC];
+    memset(zeros, 0, sizeof zeros);
+    append_raw(zeros, sizeof zeros);
+
+    struct store_recovery got = reopen();
+    CHECK(got.kept == 3, "kept %" PRIu64 ", want 3", got.kept);
+    CHECK(got.cut_bytes == REC, "cut %" PRIu64 " bytes, want %d", got.cut_bytes, REC);
+    check_records(3);
+}
+
+/* A clean file must come through recovery byte for byte unchanged. */
+static void test_recover_clean_file_untouched(void)
+{
+    make_store(4);
+    unsigned char before[HDR + 4 * REC], after[HDR + 4 * REC];
+    size_t nb = read_raw(before, sizeof before);
+
+    struct store_recovery got = reopen();
+    CHECK(got.kept == 4, "kept %" PRIu64 ", want 4", got.kept);
+    CHECK(got.cut_bytes == 0, "cut %" PRIu64 " bytes from a clean file", got.cut_bytes);
+    size_t na = read_raw(after, sizeof after);
+    CHECK(na == nb && memcmp(before, after, nb) == 0, "recovery changed a clean file");
+}
+
+/* A header with no records, then a header with less than one record. */
+static void test_recover_header_only(void)
+{
+    make_store(0);
+    struct store_recovery got = reopen();
+    CHECK(got.kept == 0 && got.cut_bytes == 0, "header-only file: kept %" PRIu64
+          ", cut %" PRIu64, got.kept, got.cut_bytes);
+
+    unsigned char junk[30];
+    memset(junk, 0x5A, sizeof junk);
+    append_raw(junk, sizeof junk);
+    got = reopen();
+    CHECK(got.kept == 0, "kept %" PRIu64 ", want 0", got.kept);
+    CHECK(got.cut_bytes == 30, "cut %" PRIu64 " bytes, want 30", got.cut_bytes);
+    CHECK(file_size() == HDR, "file is %ld bytes, want %d", file_size(), HDR);
+}
+
+/* Running recovery twice does the same as running it once (lec11: undo and
+ * redo are idempotent, because a crash can also happen during recovery). */
+static void test_recover_idempotent(void)
+{
+    make_store(6);
+    unsigned char junk[7];
+    memset(junk, 0xEE, sizeof junk);
+    append_raw(junk, sizeof junk);
+
+    struct store_recovery first = reopen();
+    unsigned char once[HDR + 6 * REC + 8], twice[HDR + 6 * REC + 8];
+    size_t n1 = read_raw(once, sizeof once);
+
+    struct store_recovery second = reopen();
+    size_t n2 = read_raw(twice, sizeof twice);
+
+    CHECK(first.kept == 6 && first.cut_bytes == 7, "first recovery: kept %" PRIu64
+          ", cut %" PRIu64, first.kept, first.cut_bytes);
+    CHECK(second.kept == 6 && second.cut_bytes == 0, "second recovery: kept %" PRIu64
+          ", cut %" PRIu64, second.kept, second.cut_bytes);
+    CHECK(n1 == n2 && memcmp(once, twice, n1) == 0, "second recovery changed the file");
+}
+
 void test_store(void)
 {
     /* Not mkdtemp(): macOS hides it under -D_POSIX_C_SOURCE. The process
@@ -318,6 +474,12 @@ void test_store(void)
     test_intact_but_wrong_header_refused();
     test_bad_record_refused();
     test_failed_write_stops_appends();
+    test_recover_torn_tail();
+    test_recover_corrupt_middle();
+    test_recover_zero_slot();
+    test_recover_clean_file_untouched();
+    test_recover_header_only();
+    test_recover_idempotent();
 
     unlink(path);
     rmdir(dir);

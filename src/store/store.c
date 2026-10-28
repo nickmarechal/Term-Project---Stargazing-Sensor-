@@ -13,6 +13,7 @@
 struct dsm_store {
     int  fd;
     bool broken;   /* a write failed, so we no longer know where the file ends */
+    struct store_recovery recovery;
 };
 
 /* write() can write fewer bytes than asked (disk nearly full, or a signal
@@ -79,10 +80,44 @@ static enum store_status check_header(int fd, off_t size)
     return STORE_OK;
 }
 
+/* Find where the good records end, and cut off everything after that.
+ * A crash in the middle of a write leaves part of a record, or a block of
+ * zeros, at the end of the file. We keep every record up to the first one
+ * that is short or fails its CRC, and drop the rest. */
+static enum store_status recover(int fd, off_t size, struct store_recovery *out)
+{
+    const off_t rec_size = (off_t)sizeof(struct dsm_record);
+    off_t end = (off_t)sizeof(struct dsm_store_header);   /* end of the good part */
+    uint64_t kept = 0;
+    struct dsm_record r;
+
+    while (size - end >= rec_size) {
+        ssize_t n = pread(fd, &r, sizeof r, end);
+        if (n < 0)
+            return STORE_ERR_IO;   /* a failed read is not a bad record: cut nothing */
+        if (n != rec_size || !record_intact(&r))
+            break;
+        kept++;
+        end += rec_size;
+    }
+
+    out->kept = kept;
+    out->cut_bytes = (uint64_t)(size - end);
+    if (end == size)
+        return STORE_OK;           /* clean: don't touch the file at all */
+
+    /* fsync so the cut itself is on the card before anything new is
+     * appended after it. */
+    if (ftruncate(fd, end) != 0 || fsync(fd) != 0)
+        return STORE_ERR_IO;
+    return STORE_OK;
+}
+
 enum store_status store_open(const char *path, struct dsm_store **out)
 {
     enum store_status st;
     struct dsm_store *s = NULL;
+    struct store_recovery rec = {0, 0};
     struct stat sb;
     int saved_errno;
 
@@ -101,8 +136,15 @@ enum store_status store_open(const char *path, struct dsm_store **out)
     }
 
     /* Empty means we just created it (or a crash came before the header
-     * was written), so it gets a header. Otherwise it must already be ours. */
-    st = sb.st_size == 0 ? write_header(fd) : check_header(fd, sb.st_size);
+     * was written), so it gets a header. Otherwise it must already be ours,
+     * and only then is it safe to cut anything off its end. */
+    if (sb.st_size == 0) {
+        st = write_header(fd);
+    } else {
+        st = check_header(fd, sb.st_size);
+        if (st == STORE_OK)
+            st = recover(fd, sb.st_size, &rec);
+    }
     if (st != STORE_OK)
         goto fail;
 
@@ -113,6 +155,7 @@ enum store_status store_open(const char *path, struct dsm_store **out)
     }
     s->fd = fd;
     s->broken = false;
+    s->recovery = rec;
     *out = s;
     return STORE_OK;
 
@@ -150,4 +193,9 @@ enum store_status store_close(struct dsm_store *s)
     int rc = close(s->fd);
     free(s);
     return rc == 0 ? STORE_OK : STORE_ERR_IO;
+}
+
+struct store_recovery store_get_recovery(const struct dsm_store *s)
+{
+    return s->recovery;
 }

@@ -12,6 +12,11 @@
  *
  * Records are only ever added at the end. Nothing is rewritten in place.
  *
+ * Crash recovery: store_open() checks every record of an existing file and
+ * cuts the file off at the first one that is incomplete or damaged, which is
+ * what a crash in the middle of a write leaves behind. store_get_recovery()
+ * says what it kept and what it cut.
+ *
  * Durability today: store_append() hands the bytes to the kernel. It does
  * not wait for them to reach the SD card (no fsync), so a power cut can
  * still lose the most recent records. */
@@ -41,11 +46,18 @@ enum store_status {
     STORE_ERR_BROKEN,  /* an earlier write failed; no more appends */
 };
 
+/* What recovery did when the file was opened. Both are 0 for a new file. */
+struct store_recovery {
+    uint64_t kept;       /* intact records found */
+    uint64_t cut_bytes;  /* bytes cut off the end; 0 if the file was clean */
+};
+
 /* Opaque: only store.c can see inside. */
 struct dsm_store;
 
 enum store_status store_open(const char *path, struct dsm_store **out);
 enum store_status store_append(struct dsm_store *s, const struct dsm_record *r);
 enum store_status store_close(struct dsm_store *s);
+struct store_recovery store_get_recovery(const struct dsm_store *s);
 
 #endif
