@@ -17,9 +17,11 @@
  * what a crash in the middle of a write leaves behind. store_get_recovery()
  * says what it kept and what it cut.
  *
- * Durability today: store_append() hands the bytes to the kernel. It does
- * not wait for them to reach the SD card (no fsync), so a power cut can
- * still lose the most recent records. */
+ * Durability: store_append() hands the bytes to the kernel and does not
+ * wait for them to reach the SD card. store_sync() waits (fsync). A power
+ * cut loses at most what was appended since the last store_sync(), so the
+ * caller decides the bound by how often it syncs. The library has no clock
+ * on purpose: stored picks the interval, and these tests need no timing. */
 
 #define DSM_STORE_MAGIC "DSKY"
 
@@ -52,12 +54,31 @@ struct store_recovery {
     uint64_t cut_bytes;  /* bytes cut off the end; 0 if the file was clean */
 };
 
+/* What this handle has done since store_open(). Recovery's own work is in
+ * store_recovery, not here. */
+struct store_counters {
+    uint64_t records;  /* records appended */
+    uint64_t writes;   /* times records were handed to the kernel */
+    uint64_t fsyncs;   /* successful store_sync() calls */
+};
+
 /* Opaque: only store.c can see inside. */
 struct dsm_store;
 
 enum store_status store_open(const char *path, struct dsm_store **out);
 enum store_status store_append(struct dsm_store *s, const struct dsm_record *r);
+
+/* fsync: returns once everything appended so far is on the card. If fsync
+ * fails we no longer know what reached the card, so the handle is marked
+ * broken (STORE_ERR_IO now, STORE_ERR_BROKEN after) and the caller should
+ * exit and let recovery run on the next open. */
+enum store_status store_sync(struct dsm_store *s);
+
+/* Syncs, then closes and frees, even if the sync fails (STORE_ERR_IO).
+ * A broken handle is not synced: it is closed and freed, and the result
+ * is STORE_ERR_BROKEN. */
 enum store_status store_close(struct dsm_store *s);
 struct store_recovery store_get_recovery(const struct dsm_store *s);
+struct store_counters store_get_counters(const struct dsm_store *s);
 
 #endif

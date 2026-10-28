@@ -12,8 +12,9 @@
 
 struct dsm_store {
     int  fd;
-    bool broken;   /* a write failed, so we no longer know where the file ends */
+    bool broken;   /* a write or fsync failed, so we no longer know where the file ends */
     struct store_recovery recovery;
+    struct store_counters counters;
 };
 
 /* write() can write fewer bytes than asked (disk nearly full, or a signal
@@ -156,6 +157,7 @@ enum store_status store_open(const char *path, struct dsm_store **out)
     s->fd = fd;
     s->broken = false;
     s->recovery = rec;
+    memset(&s->counters, 0, sizeof s->counters);
     *out = s;
     return STORE_OK;
 
@@ -182,6 +184,25 @@ enum store_status store_append(struct dsm_store *s, const struct dsm_record *r)
         s->broken = true;
         return STORE_ERR_IO;
     }
+    s->counters.records++;
+    s->counters.writes++;
+    return STORE_OK;
+}
+
+enum store_status store_sync(struct dsm_store *s)
+{
+    if (s->broken)
+        return STORE_ERR_BROKEN;
+
+    /* No retry. On Linux a failed fsync can drop the dirty pages it could
+     * not write, and a second fsync then reports success for data that
+     * never reached the card. Only recovery on the next open can say what
+     * is really in the file. */
+    if (fsync(s->fd) != 0) {
+        s->broken = true;
+        return STORE_ERR_IO;
+    }
+    s->counters.fsyncs++;
     return STORE_OK;
 }
 
@@ -190,12 +211,24 @@ enum store_status store_close(struct dsm_store *s)
 {
     if (s == NULL)
         return STORE_OK;
+
+    enum store_status st = store_sync(s);
+    int saved_errno = errno;   /* keep the sync's reason if it failed */
     int rc = close(s->fd);
     free(s);
+    if (st != STORE_OK) {
+        errno = saved_errno;
+        return st;
+    }
     return rc == 0 ? STORE_OK : STORE_ERR_IO;
 }
 
 struct store_recovery store_get_recovery(const struct dsm_store *s)
 {
     return s->recovery;
+}
+
+struct store_counters store_get_counters(const struct dsm_store *s)
+{
+    return s->counters;
 }

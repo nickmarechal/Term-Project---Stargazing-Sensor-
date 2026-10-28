@@ -454,6 +454,102 @@ static void test_recover_idempotent(void)
     CHECK(n1 == n2 && memcmp(once, twice, n1) == 0, "second recovery changed the file");
 }
 
+/* Counters say what this handle did, so stored can log them and a test can
+ * prove how many records, writes and fsyncs a sequence of calls cost. */
+static void test_counters(void)
+{
+    unlink(path);
+    struct dsm_store *s = NULL;
+    if (store_open(path, &s) != STORE_OK) {
+        CHECK(0, "open failed");
+        return;
+    }
+    struct store_counters c = store_get_counters(s);
+    CHECK(c.records == 0 && c.writes == 0 && c.fsyncs == 0,
+          "new handle: records %" PRIu64 " writes %" PRIu64 " fsyncs %" PRIu64,
+          c.records, c.writes, c.fsyncs);
+
+    CHECK(append_range(s, 0, 3) == 0, "appends failed");
+    c = store_get_counters(s);
+    CHECK(c.records == 3, "records %" PRIu64 ", want 3", c.records);
+    CHECK(c.writes == 3, "writes %" PRIu64 ", want 3 (one per append)", c.writes);
+    CHECK(c.fsyncs == 0, "fsyncs %" PRIu64 " before any store_sync", c.fsyncs);
+
+    struct dsm_record bad = make_rec(3);
+    bad.v[1] = 5;   /* changed after sealing */
+    CHECK(store_append(s, &bad) == STORE_ERR_BADREC, "unsealed record accepted");
+    c = store_get_counters(s);
+    CHECK(c.records == 3 && c.writes == 3, "a refused record was counted");
+
+    CHECK(store_sync(s) == STORE_OK, "first sync failed");
+    CHECK(store_sync(s) == STORE_OK, "second sync failed");
+    c = store_get_counters(s);
+    CHECK(c.fsyncs == 2, "fsyncs %" PRIu64 ", want 2", c.fsyncs);
+    CHECK(c.records == 3, "a sync changed records to %" PRIu64, c.records);
+    CHECK(store_close(s) == STORE_OK, "close failed");
+    check_records(3);
+
+    /* A reopened file already holds 3 records, but this handle wrote none. */
+    if (store_open(path, &s) != STORE_OK) {
+        CHECK(0, "reopen failed");
+        return;
+    }
+    c = store_get_counters(s);
+    CHECK(c.records == 0 && c.writes == 0 && c.fsyncs == 0,
+          "reopened handle starts at records %" PRIu64 " writes %" PRIu64
+          " fsyncs %" PRIu64, c.records, c.writes, c.fsyncs);
+    store_close(s);
+}
+
+/* Make the next append fail for real, as in test_failed_write_stops_appends:
+ * lower RLIMIT_FSIZE to 10 bytes past the current end. Returns 1 if the
+ * handle is now broken. */
+static int break_store(struct dsm_store *s)
+{
+    struct rlimit old, low;
+    if (getrlimit(RLIMIT_FSIZE, &old) != 0)
+        return 0;
+    low = old;
+    low.rlim_cur = (rlim_t)file_size() + 10;
+
+    void (*old_handler)(int) = signal(SIGXFSZ, SIG_IGN);
+    int lowered = setrlimit(RLIMIT_FSIZE, &low) == 0;
+    struct dsm_record r = make_rec(99);
+    enum store_status st = store_append(s, &r);
+    setrlimit(RLIMIT_FSIZE, &old);
+    signal(SIGXFSZ, old_handler);
+
+    return lowered && st == STORE_ERR_IO;
+}
+
+/* After a failed write we don't know where the file ends, so a sync must
+ * not report success: the caller would believe its data was safe. Close
+ * still frees the handle (valgrind and ASan check that), and the next open
+ * cuts off whatever part of the failed record reached the file. */
+static void test_sync_on_broken_handle(void)
+{
+    unlink(path);
+    struct dsm_store *s = NULL;
+    if (store_open(path, &s) != STORE_OK) {
+        CHECK(0, "open failed");
+        return;
+    }
+    CHECK(append_range(s, 0, 1) == 0, "append failed");
+    CHECK(break_store(s), "could not make a write fail, so this test proved nothing");
+
+    CHECK(store_sync(s) == STORE_ERR_BROKEN, "sync on a broken handle did not return BROKEN");
+    struct store_counters c = store_get_counters(s);
+    CHECK(c.fsyncs == 0, "a refused sync was counted");
+    CHECK(c.records == 1, "records %" PRIu64 ", want 1 (the failed one is not counted)",
+          c.records);
+    CHECK(store_close(s) == STORE_ERR_BROKEN, "close of a broken handle did not return BROKEN");
+
+    struct store_recovery got = reopen();
+    CHECK(got.kept == 1, "kept %" PRIu64 ", want 1", got.kept);
+    CHECK(got.cut_bytes <= 10, "cut %" PRIu64 " bytes, want 0..10", got.cut_bytes);
+    check_records(1);
+}
+
 void test_store(void)
 {
     /* Not mkdtemp(): macOS hides it under -D_POSIX_C_SOURCE. The process
@@ -480,6 +576,8 @@ void test_store(void)
     test_recover_clean_file_untouched();
     test_recover_header_only();
     test_recover_idempotent();
+    test_counters();
+    test_sync_on_broken_handle();
 
     unlink(path);
     rmdir(dir);
