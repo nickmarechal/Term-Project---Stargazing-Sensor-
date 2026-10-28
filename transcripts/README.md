@@ -60,8 +60,15 @@ sessions. Working in one shared login defeats this and costs **both** partners.
   they come from the parent `CS 370` project directory and cover **all** CS 370 work in that
   window (HW1 and term-project ideation together). Copied as-is, unedited, as required. Sessions
   from here on will be scoped to this repo's own project directory.
-- `liam/2026-09-23-m1/` — Liam Sagal's sessions from this repo's own project directory
+- `nick/2026-10-28-m2/` — Nick's term-project session through 2026-10-28 (the same session ID
+  as in `m0-m1`, so this is a later, longer snapshot of it), plus its two subagent sessions
+  (`subagent-*.jsonl`). Still from the parent `CS 370` project directory. **One edit from
+  as-is:** a password Nick typed into chat on 2026-10-27 is replaced with `[REDACTED-PASSWORD]`
+  (12 occurrences, a `sed` over the copy; every line is still valid JSON). Nothing else changed.
+- `liam/2026-09-23-m0-m1/` — Liam Sagal's sessions from this repo's own project directory
   (`~/.claude/projects/-s-parsons-g-under-C837127061-cs370-Term-Project/`). Copied as-is,
   unedited.
+- `liam/2026-10-27-m2/` — Liam's sessions through the M2 design document, copied as-is.
+
 Each partner uses their own named folder (`nick/`, `liam/`). The `partner/` placeholder from the
 initial setup has been removed now that both are populated.
