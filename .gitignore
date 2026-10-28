@@ -19,5 +19,8 @@ build/
 core
 core.*
 
+# course handout: read locally, never committed
+docs/CS370-TermProject.pdf
+
 # NOTE: transcripts/**/*.jsonl are intentionally NOT ignored. They are a graded
 # deliverable and committing them is how they survive the 30-day local purge.
