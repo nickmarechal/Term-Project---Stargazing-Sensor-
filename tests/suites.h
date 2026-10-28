@@ -6,5 +6,6 @@ void test_crc32(void);
 void test_record(void);
 void test_log(void);
 void test_store(void);
+void test_convert(void);
 
 #endif

@@ -12,6 +12,7 @@ int main(void)
     test_record();
     test_log();
     test_store();
+    test_convert();
 
     printf("%d checks, %d failed\n", check_count, check_failures);
     return check_failures == 0 ? 0 : 1;

@@ -8,7 +8,9 @@ CC := gcc
 # macOS shows them anyway, so leaving this out would only break on the Pi.
 CFLAGS := -std=c17 -Wall -Wextra -Werror -g -O1 -Isrc -Itests \
           -D_POSIX_C_SOURCE=200809L
-SANFLAGS := -fsanitize=address,undefined -fno-omit-frame-pointer
+# -fno-sanitize-recover: undefined behavior stops the run instead of printing
+# a message and carrying on, so `make asan` fails on it like it does on ASan.
+SANFLAGS := -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer
 
 # Portable library code (no main), built and tested on macOS and Linux.
 # Each side adds files only to its own section (docs/m3-plan.md).
@@ -24,9 +26,9 @@ STORE_TSRC := tests/test_store.c
 STORE_HDR  := src/store/store.h
 
 # --- sensor side (src/sensors; portable parts only) ---
-SENSOR_SRC  :=
-SENSOR_TSRC :=
-SENSOR_HDR  :=
+SENSOR_SRC  := src/sensors/convert.c
+SENSOR_TSRC := tests/test_convert.c
+SENSOR_HDR  := src/sensors/convert.h
 
 SRC  := $(COMMON_SRC) $(STORE_SRC) $(SENSOR_SRC)
 TSRC := tests/test_main.c $(COMMON_TSRC) $(STORE_TSRC) $(SENSOR_TSRC)

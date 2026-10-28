@@ -9,6 +9,23 @@ verified, and what it leaves open.
 
 ---
 
+## 2026-10-28 (evening) — Shared pieces + sensor conversion math (Nick)
+
+- `1f74c77`: `record.h` (START kind, `enum dsm_source`, `enum dsm_fault`), `log.{c,h}`,
+  `store_client.h` (header only; `store_client.c` is the storage side's).
+- N1 done: `src/sensors/convert.{c,h}` + `tests/test_convert.c`. Every constant checked
+  against the datasheet PDFs. MLX PEC tested on the datasheet's figures 6–8; MLX °C on its
+  4.1.8.2 examples; TSL2591 full scale is **37888 at 100 ms** (not 65535); BME280 integer code
+  cross-checked against Bosch's floating-point formulas. 389 checks, 0 failed; `make asan`
+  clean; 8/8 mutants caught.
+- `make asan` now uses `-fno-sanitize-recover=all`: undefined behavior fails the run instead of
+  only printing. Proven: the datasheet's literal `<< 17` on a negative value passes the tests
+  but now fails `make asan`.
+- **Next on the sensor side:** N2 (I2C layer + `sensorcheck`, needs `darksky.local` on), then N3
+  (`skyd`, `cloudd`, `envd`; these link only once `store_client.c` is pushed), N4, integration.
+
+---
+
 ## 2026-10-28 — M3 started: crash recovery done; work split agreed (Nick)
 
 - **Canvas "TP-D2" grades M2 and M3** (10 pts each; closes Fri 2026-10-30, 8 pm MT). M2 is met.
