@@ -2,8 +2,8 @@
 
 Detail behind `DESIGN.md` § Architecture, § Mechanism mapping and § Storage and data. The record
 and header layouts are **implemented** (`src/common/record.h`, `src/store/store.h`). Everything
-marked *proposed* in the record sections is **proposed (Liam), Nick to confirm**: the kinds,
-flags, `source_id`s and payloads, which nothing depends on yet. The IPC section is Liam's
+marked *proposed* in the record sections (the kinds, flags, `source_id`s and payloads, which
+nothing depends on yet) was proposed by Liam and **confirmed by Nick on 2026-10-28**. The IPC section is Liam's
 (mechanism E). The IPC is designed but not implemented.
 
 ## Record: 48 bytes, little-endian (implemented)
@@ -123,7 +123,7 @@ the record until the reader's next 1 s timeout.
 
 | Channel | Kernel object | Rate | Notes |
 |---|---|---|---|
-| `fusiond` → `stored`, `dskyd` → `stored` | `AF_UNIX` `SOCK_SEQPACKET`, one 48-byte record per message | 1.37 rec/s; 6 rec/h | `stored` is the only writer. While it is down, `fusiond` buffers 4096 records (≈ 50 min), then drops the oldest and counts. **Proposed (Liam), Nick to confirm** |
+| `fusiond` → `stored`, `dskyd` → `stored` | `AF_UNIX` `SOCK_SEQPACKET`, one 48-byte record per message | 1.37 rec/s; 6 rec/h | `stored` is the only writer. While it is down, `fusiond` buffers 4096 records (≈ 50 min), then drops the oldest and counts. **Proposed (Liam), confirmed (Nick) 2026-10-28** |
 | `dsq` ↔ `fusiond` | `AF_UNIX` `SOCK_STREAM`, line-based request/response | on demand | `state`, `health`. `dsq` reads segments directly, read-only |
 | `dskyd` ↔ each child | pipe (child holds the write end) + `SIGCHLD` | ≥ 1 B per 5 s | EOF = died; 20 s silent = hung → `SIGKILL` |
 | all → log | stderr → journald | ≈ 6 lines/h steady + 1 per event | survives a `dskyd` crash |

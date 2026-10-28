@@ -9,6 +9,24 @@ verified, and what it leaves open.
 
 ---
 
+## 2026-10-28 — M2 confirmations, transcripts, submission (Nick)
+
+- Pulled Liam's 11 commits. `make test` 116 checks, 0 failed (macOS).
+- **Confirmed items 1–11 of the 2026-10-27 entry as written**, including the analysis split
+  (Nick: features, ephemeris, `dsq`; Liam: classifier + state machine). The ‡ marks are gone
+  from `DESIGN.md`; `README.md`, `CLAUDE.md` and `record-and-ipc.md` say the same. Nick's
+  line-by-line review of the `DESIGN.md` diffs (his PROMPTLOG cross-review episode) is still open.
+- **Transcripts:** `transcripts/nick/2026-10-28-m2/`, the term-project session through today
+  plus its two subagent sessions. One change from as-is: a password typed into chat on
+  2026-10-27 is replaced with `[REDACTED-PASSWORD]` (see `transcripts/README.md`). The session
+  keeps going after this snapshot; the M3 copy picks up the rest.
+- **Sensors still not wired.** M2's "both sensors electrically alive" is submitted as the known
+  gap already recorded in `DESIGN.md` and the hardware log (target 2026-11-03).
+- **Submission files** (outside the repo): `Term Project/submissions/cs370-DarkSkyMonitor-M2-20261028.zip`
+  and `.tar.gz`, built from a clean clone of the commit that adds this entry.
+
+---
+
 ## 2026-10-27 (evening) — M2 design document written (Liam)
 
 Nick was unavailable, so Liam wrote `DESIGN.md` alone for the M2 deadline (2026-10-28, Canvas

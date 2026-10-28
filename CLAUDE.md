@@ -29,9 +29,9 @@ and is not required to work in this repo.)
 - **Mechanisms: D** (crash-consistent storage) **+ E** (multiprocess + IPC + supervisor). C and F
   were considered and rejected — at 0.1–1 Hz sampling neither is justified, and being able to say
   why is a stronger defense answer than bolting them on.
-- **Design: `DESIGN.md` M2 draft written 2026-10-27 (Liam).** Every decision in Nick's area is
-  marked ‡ "proposed (Liam), Nick to confirm"; the list is in the 2026-10-27 M2 entry of
-  [`docs/progress-log.md`](docs/progress-log.md). Values marked (a) are datasheet assumptions,
+- **Design: `DESIGN.md` M2 written 2026-10-27 (Liam).** The decisions in Nick's area (listed in
+  the 2026-10-27 M2 entry of [`docs/progress-log.md`](docs/progress-log.md)) were confirmed by
+  Nick on 2026-10-28. Values marked (a) are datasheet assumptions,
   not measurements. Record, IPC and supervision detail: [`docs/record-and-ipc.md`](docs/record-and-ipc.md).
 - **Next action:** wire `darksky.local` and run hardware-log §1–5 **by 2026-11-03**. M2's
   "both sensors electrically alive" was **not met** at the deadline (a dated known gap in
@@ -86,10 +86,8 @@ boundary.
   **E**: the supervisor (`dskyd`), the sensor daemons, the shm rings, sockets and pipes, and
   `fusiond`'s ring-draining loop. All Linux-only I2C code lives in `src/sensors/`, so everything
   else builds and tests on a Mac.
-- **Analysis and query CLI: proposed (Liam), Nick to confirm.** Liam: classifier + state machine.
-  Nick: features, ephemeris, and the `dsq` query CLI.
-- **Nick's open items:** confirm the analysis split above, and every ‡ decision in `DESIGN.md`
-  (listed in the progress log's M2 entry).
+- **Analysis and query CLI (proposed by Liam, confirmed by Nick 2026-10-28):** Liam: classifier +
+  state machine. Nick: features, ephemeris, and the `dsq` query CLI.
 - The agent edits outside the current session owner's area only when told explicitly whose
   session this is.
 
