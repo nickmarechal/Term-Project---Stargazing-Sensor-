@@ -1,18 +1,67 @@
 # Design Document (M2)
 
-> **STATUS: NOT YET WRITTEN.** Due end of Week 7. This is the required-sections skeleton from
-> spec §8 so nothing gets forgotten. 3–5 pages, and per the spec "the most leveraged hours of the
-> whole project — every hour of arguing here saves five of rewriting later."
+> **STATUS: M2 draft, 2026-10-27, written by Liam.** Nick was unavailable, so every decision in
+> his area (storage, mechanism D, the record contract) is marked **proposed (Liam), Nick to
+> confirm**. Values marked **(a)** are **assumed (datasheet), verify at bring-up**; the sensors are
+> not wired yet, so no hardware value in this document is measured.
 >
 > At final submission this file must reflect the design **as it ended, not as it began**, with a
 > short changelog of what M2's version got wrong.
 
 ## Architecture
 
-A diagram in the spirit of the spec's Figure 1: processes, threads, kernel components, data
-flows, and **rates on every arrow**.
+Seven single-threaded processes (`1T`). A *rec* is one sealed 48-byte `struct dsm_record`
+(`src/common/record.h`). The rates come from the sample periods: 5 s / 1 s / 10 s for sky
+brightness, IR sky temperature, and ambient conditions, matching how fast each signal changes.
 
-**TODO.**
+**Data path**
+
+```
+  TSL2591 @0x29 (a)          MLX90614 @0x5A (a)          BME280 @0x76 (a)       head at zenith
+        └───────────────────────────┼────────────────────────────┘
+                                    │ I2C bus 1, 3.3 V, 100 kHz (a): ≈2.6 transfers/s in total
+════════════════════════════════════╪═════════════════════════════════════════════════ kernel
+                i2c-bcm2835 driver + i2c-dev (/dev/i2c-1): one transfer at a time (a)
+        ┌───────────────────────────┼────────────────────────────┐
+        │ 0.4 xfer/s (a)            │ 2 xfer/s (a)               │ 0.2 xfer/s (a)    ioctl(I2C_RDWR)
+════════╪═══════════════════════════╪════════════════════════════╪════════════════════ user
+   ┌────▼─────┐                ┌────▼─────┐                 ┌────▼─────┐
+   │ skyd  1T │                │cloudd 1T │                 │ envd  1T │
+   └────┬─────┘                └────┬─────┘                 └────┬─────┘
+        │ 0.2 rec/s → ring 1        │ 1 rec/s → ring 2           │ 0.1 rec/s → ring 3
+        └───────────────────────────┼────────────────────────────┘
+                                    │ 1.3 rec/s read · 1.3 sem_post/s     3 POSIX shm rings in
+                                    │                                     /dev/shm, 1024 × 48 B
+                                    │                                     each + 1 shared semaphore
+                            ┌───────▼────────┐   AF_UNIX stream    ┌────────────┐
+                            │  fusiond   1T  │◄───── on demand ───►│  dsq (CLI) │◄── user, over SSH
+                            └───────┬────────┘                     └─────┬──────┘
+                                    │ AF_UNIX SEQPACKET                  │ read-only open(),
+                                    │ 1.37 rec/s ≈ 66 B/s                │ on demand
+                            ┌───────▼────────┐                           │
+              dskyd ───────►│  stored    1T  │                           │
+          SEQPACKET 6 rec/h └───────┬────────┘                           │
+                                    │ write() every 10 s (≈660 B) · fsync() every 60 s
+════════════════════════════════════╪════════════════════════════════════╪════════════ kernel
+                     page cache → ext4 → mmc driver → 16 GB microSD: ≈5.7 MB/day
+```
+
+Rates: 1.37 rec/s into `stored` = 1.3 SAMPLE + 4 FEATURE/min + ≥1 STATE/10 min, ≈5.7 MB/day
+(computed). 6 HEARTBEAT/h = five children + `dskyd`. I2C transfer counts are our planned read
+sequences, checked at bring-up (hardware-log §1–3). Every channel is `AF_UNIX`, a pipe, shared
+memory or a signal: **no IP sockets**; the user reaches `dsq` over SSH. Intervals use
+`CLOCK_MONOTONIC`, labels `CLOCK_REALTIME`; `fusiond` checks clock sync with `adjtimex()` 1/min
+(no RTC until the DS3231 ordered 2026-10-27 is fitted; see Constraints).
+
+| Process | Job (owners: see Ownership map) |
+|---------|------------------------------------------------------------------------------|
+| `dskyd` | Supervisor. Runs under systemd (`Restart=on-failure`); fork/execs the five children (`PR_SET_PDEATHSIG`). Per-child liveness pipe, ≥1 B / 5 s: EOF = died, 20 s silent = hung → `SIGKILL`. `SIGCHLD` + `waitpid()` exit code: crashed vs. sensor absent. Backoff 1→60 s; `DEAD` + re-probe every 60 s. Hourly `/proc/<pid>/statm`, `/stat` → HEARTBEAT to `stored`. All stderr → journald (≈6 lines/h) |
+| `skyd` | TSL2591 → ring 1 every 5 s (a); 600 ms integration; gain stepped with hysteresis |
+| `cloudd` | MLX90614 ambient + object → ring 2 every 1 s (a); PEC checked |
+| `envd` | BME280 forced mode → ring 3 every 10 s (a); integer compensation |
+| `fusiond` | Drains rings; sensor staleness; features, sun/moon, classifier, state machine; forwards SAMPLEs to `stored`; answers `dsq` |
+| `stored` | Only writer of segments: batch, `fsync`, rotate, recover. `fusiond` buffers 4096 recs while it is down |
+| `dsq` | Short-lived CLI: live state and health via `fusiond`; time-range dump from segments, read-only |
 
 ## Mechanism mapping
 
