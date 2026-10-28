@@ -159,20 +159,43 @@ recovery, batching, `fsync`, rotation, rollups.
 
 ## Constraints and substitutions
 
-What the ideal build would use, what we are actually using, and what the gap costs: sensors
-downgraded, data synthesized or replayed, claims narrowed.
+| Area | Ideal → actual | What the gap costs |
+|------------|-------------------------------------------|------------------------------------------|
+| Brightness | calibrated sky-quality meter → TSL2591, no reference SQM | brightness is **relative to the site baseline**, never absolute mag/arcsec² |
+| Cloud | commercial cloud sensor → MLX90614 + BME280, humidity correction fitted from our data | if humid-clear and overcast don't separate, the cloud claim narrows to dry nights |
+| Hardware | Adafruit parts, Pi 4 2 GB, 32 GB high-endurance card → Amazon clones (GY-906 etc.), Pi 4 **1 GB**, standard 16 GB card | BME280 may be a BMP280 (hardware-log §2); MLX90614 field of view unknown; no Pi or card cost expected at ≈5.7 MB/day (a) |
+| Kits | one device → **two sensor kits** (one per partner) for parallel development | soak, demo and every evaluation number come **only from the device of record, `darksky.local` (Nick's Pi)**; parts differences between kits are logged in the hardware log |
+| Clock | DS3231 RTC → none until the one ordered 2026-10-27 arrives | after an offline power cut, verdicts are UNKNOWN until network time |
+| Enclosure | weatherproof head, LDPE window, dew heater → none yet (hardware-log §4) | no unattended outdoor runs until built; dew detected, not prevented |
+| User, ground truth | named astronomer, months of labeled nights → archetype (outreach pending); observation log 2–3×/night + provoked and replayed data (`SYNTHETIC`) | requirements come from PROBLEM.md, not interviews; few clear November nights, so counts, not percentages, on small n |
+| Budget | spec §17: $50–80 per team → two kits: Nick's ≈ $68 (Pi + sensors; PSU, card, reader unrecorded), Liam's not yet recorded | over budget with two kits plus RTC and enclosure; the second kit buys parallel bring-up, not a better device |
 
-> "A design document with nothing to report here has usually not met its hardware yet."
-
-**TODO.** Already known: the budget forced a 2-sensor build, and single-unit retail pricing runs
-well above the spec's $50–80 estimate.
+**Known gap (2026-10-27): "both sensors electrically alive" is not met.** The device of record
+is set up (hardware-log §0), but no sensors are wired on either kit, so every (a) value is
+unverified. Plan: wire and run hardware-log §1–5 on `darksky.local`, target 2026-11-03, and
+correct this document from the evidence.
 
 ## Evaluation plan
 
-The measurements we will take (spec §9), each with its method and its target. Numbers committed
-to now are twice as credible when hit later, and instructive either way.
+Targets are commitments, not results. (a) = depends on hardware not yet measured. ‡ =
+**proposed (Liam), Nick to confirm**. "Loaded" = `stress-ng --cpu 4`.
 
-**TODO.**
+| # | Measurement | Method | Target |
+|-|----------------|------------------------------------------|---------------------------|
+| 1 | Sample → hub latency | `t_mono` at read vs. at ring dequeue; 24 h idle + 24 h loaded; distributions | p99 ≤ 50 ms idle, ≤ 200 ms loaded (a) |
+| 2 | Sample → durable latency ‡ | read time vs. the `fsync()` covering it | p99 ≤ 61 s, by design |
+| 3 | Unplug → UNKNOWN | pull a sensor 20×; last good sample → STATE record | max ≤ 60 s (R-E1) |
+| 4 | CPU and RSS per process | hourly HEARTBEAT over the 48 h soak, plotted | total < 5 % of one core; each RSS ≤ 8 MB; growth ≤ 1 % after hour 1 (a) |
+| 5 | **Domain:** cloud-state accuracy | ground truth: a manual sky observation (cloud cover in okta), logged with its time alongside the device reading at that moment; device ΔT_corr class (clear / broken / overcast) vs. that log; confusion matrix | ≥ 80 % agreement on ≥ 40 observations |
+| 6 | **Domain:** night verdict | GOOD/MARGINAL/POOR vs. the observer's verdict; reported as N of M | ≥ 70 % on ≥ 20 observations |
+| 7 | **E:** `kill -9` recovery | 20 kills of each of 5 children, scripted | detection ≤ 1 s; first new sample ≤ 10 s (R-E2); no loss in other sensors |
+| 8 | **E:** hang recovery | `kill -STOP` each sensor daemon 10× | `SIGKILL` at 20 ± 1 s; UNKNOWN ≤ 60 s |
+| 9 | **E:** cost of isolation | sample-interval jitter, 1 vs. 3 daemons on the bus, idle and loaded | p99 jitter ≤ 50 ms (a); > 100 ms → switch to the I2C broker |
+| 10 | **D:** `fsync` sweep ‡ | 1 / 10 / 60 / 300 s; card writes from `/proc/diskstats`, `fsync()` duration distribution | ≤ 30 MB/day written at 60 s (a); the full curve reported |
+| 11 | **D:** power-cut recovery ‡ | pull the plug mid-write ≥ 20×, outside the soak | 20/20 automatic; ≤ 60 s lost each time (R-D1, R-D2) |
+| 12 | Ephemeris ‡ | sun and moon altitude vs. published almanac, ≥ 50 dates | ≤ 0.1° sun, ≤ 0.5° moon |
+| 13 | Fault injection | every failure-table row, injected as listed | expected log line present; recovery (or held `DEAD`) with no manual step |
+| 14 | 48 h soak (spec §3.4) | live sensors; hourly heartbeat; ≥ 1 unplug and ≥ 1 `kill -9` | 48 h; no unplanned restarts; no `seq` gaps outside injected faults |
 
 ## Ownership map
 
