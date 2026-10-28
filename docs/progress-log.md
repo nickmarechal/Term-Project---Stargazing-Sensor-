@@ -9,6 +9,27 @@ verified, and what it leaves open.
 
 ---
 
+## 2026-10-28 — Pulled Nick's bring-up; status check (Liam)
+
+- Pulled `2deadc7`, `022d55d`, `b527bf2`. No code changed (`src/`, `tests/`, `Makefile`
+  untouched). On a CS department Linux machine (x86-64), **not the Pi**: `make` exit 0;
+  `make test` 116 checks, 0 failed; `make asan` 116 checks, 0 failed.
+- **Closes from the 2026-10-27 entry:** "no sensor wired" / target 2026-11-03 (met 2026-10-28,
+  hardware-log §1–2, `i2c-tools` checks, not project code); Nick's confirmation of items 1–11
+  (the ‡ marks are gone); M2 transcripts copied by both; the `transcripts/README.md` folder name.
+- **M3 state: unchanged.** The repo has the storage library (`src/common/`, `src/store/`) and its
+  tests only. No sensor daemons, IPC, supervisor, `stored` daemon, recovery or `fsync`; no logs or
+  soak output. Nothing in the repo shows M3 working. The spec estimate puts M3 at ~Oct 30;
+  Canvas dates govern.
+- **Open:** hardware-log §3–5 on `darksky.local`; `starlight.local` not wired; Nick's review of
+  the `DESIGN.md` diffs; Liam's review of `src/store/` and `src/common/` in `PROMPTLOG-liam.md`;
+  the BOM Decisions section (2 GB, 32 GB high-endurance) and `design-review.md` CHALLENGE 3
+  (RTC "not optional") still contradict the design.
+- **To agree with Nick and the TA:** `CLAUDE.md` says transcripts are copied as-is; Nick's M2
+  copy redacts a password. Whether to write that exception into `CLAUDE.md` is not decided.
+
+---
+
 ## 2026-10-28 — M2 confirmations, transcripts, submission (Nick)
 
 - Pulled Liam's 11 commits. `make test` 116 checks, 0 failed (macOS).
@@ -100,7 +121,7 @@ sockets. With no RTC: `CLOCK_UNSYNC` flag and an UNKNOWN verdict.
   enclosure.
 - DS3231 RTC: to be ordered.
 - **No sensor wired on either kit.** "Both sensors electrically alive" was not met for M2; target
-  2026-11-03 for hardware-log §1–5 on `darksky.local`.
+  2026-11-03 for hardware-log §1–5 on `darksky.local`. *(Superseded 2026-10-28, see above.)*
 
 ### Open
 
