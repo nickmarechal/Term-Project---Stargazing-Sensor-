@@ -7,8 +7,10 @@ Prof. Shrideep Pallickara.
 
 **Team:** Nick Marechal, Liam Sagal
 
-> **Status: M1 → M2.** Concept locked (**Dark Sky Monitor**), problem memo written, sensors and
-> Pi ordered 2026-10-06. Next: sensor bring-up (`docs/hardware-log.md`) and the M2 design document.
+> **Status: M2.** **Dark Sky Monitor.** `DESIGN.md` drafted 2026-10-27 (decisions in Nick's area
+> await his confirmation). Two kits: `darksky.local` (device of record) and `starlight.local`
+> (development). **Sensors not yet wired**; bring-up target 2026-11-03 (`docs/hardware-log.md`).
+> Where we left off: `docs/progress-log.md`.
 
 ## What this will be
 
@@ -43,14 +45,14 @@ Targets run today; most are no-ops until there is source to build.
 make deploy PI=pi@<hostname>
 ```
 
-Not yet configured — the Pi has not been ordered.
+The device of record is `darksky.local`; nothing runs on it yet beyond the test suite.
 
 ## Repository layout
 
 ```
 CLAUDE.md          team law: constraints, ownership, workflow (graded deliverable)
 PROBLEM.md         the problem memo (M1)
-DESIGN.md          the design document (M2) — not yet written
+DESIGN.md          the design document (M2 draft)
 EVALUATION.md      the evaluation report (M5) — not yet written
 src/               systems core (C17)
 tests/             tests
@@ -62,4 +64,4 @@ transcripts/       raw .jsonl Claude Code sessions, per partner, per milestone
 ## For a TA grading this
 
 By final submission, this README must take you from a clean Raspberry Pi to a running system
-without our help. It does not do that yet — the project is at M0.
+without our help. It does not do that yet — the project is at M2.
