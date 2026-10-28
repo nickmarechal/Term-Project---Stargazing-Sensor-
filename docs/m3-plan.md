@@ -96,8 +96,8 @@ Behavior notes for the implementation:
 
 - `record.h`: `DSM_KIND_START = 6`; `enum dsm_source` = 1 `skyd`, 2 `cloudd`, 3 `envd`,
   4 `fusiond`, 5 `dskyd`, 6 `stored`; `enum dsm_fault` = 1 read failed, 2 wrong chip ID.
-- `log.{c,h}`: `log_init(proc)`, then `log_msg(level, event, fmt, ...)` writes one line to stderr
-  in the DESIGN.md format `<ISO time> <mono s> <proc>[pid] LEVEL event k=v`, for example
+- `log.{c,h}`: `log_init(proc, stderr)` once (the second argument lets tests capture lines),
+  then `log_msg(level, event, fmt, ...)` writes one line in the DESIGN.md format `<ISO time> <mono s> <proc>[pid] LEVEL event k=v`, for example
   `2026-10-28T19:02:11-0600 1234.567 stored[812] WARN recover kept=118 cut_bytes=31`.
   Levels: `LVL_INFO`, `LVL_WARN`, `LVL_ERROR` (not `LOG_*`, which `<syslog.h>` already uses).
 

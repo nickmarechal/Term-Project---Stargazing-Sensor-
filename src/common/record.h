@@ -14,6 +14,24 @@ enum dsm_kind {
     DSM_KIND_STATE     = 3,
     DSM_KIND_HEARTBEAT = 4,
     DSM_KIND_FAULT     = 5,
+    DSM_KIND_START     = 6,   /* first record of every run; seq 0, v[0] = run number */
+};
+
+/* dsm_record.source_id: which process made the record. These numbers are
+ * stored on disk, so they never change. 0 is never used. */
+enum dsm_source {
+    DSM_SRC_SKYD    = 1,   /* TSL2591, sky brightness */
+    DSM_SRC_CLOUDD  = 2,   /* MLX90614, sky IR temperature */
+    DSM_SRC_ENVD    = 3,   /* BME280, air temperature, humidity, pressure */
+    DSM_SRC_FUSIOND = 4,
+    DSM_SRC_DSKYD   = 5,
+    DSM_SRC_STORED  = 6,
+};
+
+/* v[0] of a FAULT record: what went wrong. */
+enum dsm_fault {
+    DSM_FAULT_READ    = 1,   /* an I2C read failed; v[1] = errno */
+    DSM_FAULT_CHIP_ID = 2,   /* the chip answered with the wrong ID */
 };
 
 /* Bits in dsm_record.flags. They describe the reading, not the bytes.
