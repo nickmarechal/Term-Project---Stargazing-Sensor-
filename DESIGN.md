@@ -65,17 +65,55 @@ memory or a signal: **no IP sockets**; the user reaches `dsq` over SSH. Interval
 
 ## Mechanism mapping
 
-For each chosen menu item (A–F): which component implements it, and a justification **from the
-user's requirements** — not from habit or from what looked easiest. The defense tests this
-justification directly.
+The user (PROBLEM.md) pays **30–45 min of setup or a 30–60 min drive** for every GOOD verdict
+they act on, and the product's value is a **site baseline built over weeks**. Both mechanisms
+come from those two facts.
 
-Example of the required form: *"the vibration analysis is meaningless above 2 ms of sampling
-jitter, hence `SCHED_FIFO`."*
+**E: multi-process + IPC + supervisor.** *Component:* `dskyd`, one process per sensor, and
+`fusiond`, over shm rings and `AF_UNIX` sockets. *Requirement:* **R-E1** a dead, hung or
+unplugged sensor turns the verdict to UNKNOWN within **60 s** while the other sensors keep
+sampling; **R-E2** a crashed process costs ≤ **10 s** of that sensor's data. *Why:* at a dark
+site, overcast reads *darker* than clear, so a silent IR sensor produces a confident false GOOD,
+the exact error that wastes the user's evening. In one process, a hung `ioctl` stalls every
+sensor and a segfault kills them all. Separate processes keep the failure local: `dskyd`
+restarts it, `fusiond` flags staleness after 3 missed periods (≤ 30 s), and the verdict degrades
+honestly.
 
-| Mechanism | Component | Justification from the user's requirements |
-|---|---|---|
-| TODO | TODO | TODO |
-| TODO | TODO | TODO |
+**D: custom crash-consistent storage.** *Component:* `stored` (`src/store/`) and the record
+format (`src/common/`); policy numbers **proposed (Liam), Nick to confirm**. *Requirement:*
+**R-D1** a power cut mid-write loses ≤ **60 s** of records and never an earlier one; **R-D2**
+recovery is automatic on every boot, target **20/20** pulled-plug tests; **R-D3** ≥ **180 days**
+of raw data plus all nightly rollups fit on the 16 GB card. *Why:* the baseline *is* the
+product's memory, and a device on a yard extension cord sees brownouts (spec §17). Verdicts use
+30-min windows, so losing ≤ 60 s (≤ 3 %) cannot flip a night's grade. That sets `fsync` at 60 s
+rather than per record, with writes batched every 10 s to spare the card. CRC-sealed fixed-size
+records make "truncate at the first bad record" a complete recovery rule.
+
+**Isolation boundaries (E).** Each process boundary contains one failure: `skyd` — an I2C hang
+in brightness must not stop cloud sensing; `cloudd` — the most failure-prone part (SMBus quirk),
+isolated; `envd` — the humidity input, fails independently; `fusiond` — analysis can crash and
+restart without stopping sampling; `stored` — a single writer rules out multi-writer corruption by
+construction; `dskyd` — must outlive every child, and is itself restarted by systemd.
+
+**Ring invariants (E).** One single-producer/single-consumer ring per sensor; `dskyd` creates the
+shared memory before the fork. Chosen over sockets for **decoupled lifetimes**, not speed (1.3
+rec/s is slow): samples keep queuing while `fusiond` restarts, and a sensor never blocks on it.
+
+1. **Publish after write:** fill slot `head % N` with a sealed record, *then* release-store
+   `head`; the reader acquire-loads `head`. A producer killed mid-copy never exposes the slot.
+2. **CRC on read:** the reader checks `record_intact()` on its copy; a torn slot is counted and
+   dropped.
+3. **Never overwrite unread:** write only while `head − tail < N`; when full, drop the *new*
+   sample and count an overrun (the `seq` gap proves it).
+4. **Reader restart:** `tail` advances only after forwarding, so a killed `fusiond` may re-send
+   one record; the duplicate (source, run, seq) is removed at query time.
+5. **Lock-free:** `_Static_assert(ATOMIC_INT_LOCK_FREE == 2)`, because a lock-based atomic
+   deadlocks if a process dies holding it. **Assumed, confirmed at build on the Pi.**
+
+**Rejected.** **C** (real-time): sky brightness changes over minutes, so no path has a deadline.
+**F** (no-drop high-rate): 1.3 rec/s total; a high-rate pipeline would be padding. **A** (driver)
+is a stretch goal only if M3 lands early; **B** would only be honest with a pulse-output sensor
+(TSL237) we did not buy.
 
 ## Failure-mode table
 
