@@ -9,6 +9,28 @@ verified, and what it leaves open.
 
 ---
 
+## 2026-10-28 (night) — M3 met on darksky.local: sensors → stored → store, D demo (Nick)
+
+- **N2–N3 done** (`efc5261`): `src/sensors/i2c.{c,h}` (`I2C_RDWR`, repeated start), `chips.{c,h}`
+  (per-chip setup/read), `daemon.{c,h}` (the shared loop: START, SAMPLE on absolute
+  `CLOCK_MONOTONIC` deadlines, FAULT, exit 3 after 3 failed reads, `stored_down`/`stored_up`
+  logging), `skyd`/`cloudd`/`envd` (one `main` each), `sensorcheck`. Linux-only; built by
+  `make all` on Linux.
+- **Evidence for M3 is in [`m3-checkpoint.md`](m3-checkpoint.md)**, all on live sensors:
+  `sensorcheck` VALID ×3; a 70 s run of all three programs into `stored` (94 records = exactly
+  what was sent, 0 dropped, no `seq` gaps); the D demo (`kill -9 stored` + a **provoked** 20-byte
+  torn tail → `recover kept=28 cut_bytes=20`, sensors reconnected on their own, `cloudd`'s
+  8 drops match its `seq` gap 20 → 29).
+- **valgrind found a real bug** in `i2c.c`: uninitialized struct padding passed to
+  `ioctl(I2C_RDWR)`. Fixed with `memset`. After the fix, `tools/valgrind-pipeline.sh` (all
+  programs together on live sensors): 0 errors, all heap freed, for `stored`, `skyd`, `cloudd`,
+  `envd`, `sensorcheck`.
+- **Open for M4:** ≥ 20 real plug-pulls (evaluation #11), the `fsync` sweep (#10), `dskyd`
+  (mechanism E), segments, batching. `tools/run-m3.sh` (N4) was not needed: the commands in
+  `m3-checkpoint.md` start the pipeline; `dskyd` will replace any launcher at M4.
+
+---
+
 ## 2026-10-28 (late) — Storage side S1–S5 done and pushed (Liam)
 
 - **Commits:** `d6ddff7` (S1: `store_sync`, counters), `8f93e45` (S3 `stored`, S4 `store_client.c`,

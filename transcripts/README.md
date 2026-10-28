@@ -65,6 +65,10 @@ sessions. Working in one shared login defeats this and costs **both** partners.
   (`subagent-*.jsonl`). Still from the parent `CS 370` project directory. **One edit from
   as-is:** a password Nick typed into chat on 2026-10-27 is replaced with `[REDACTED-PASSWORD]`
   (12 occurrences, a `sed` over the copy; every line is still valid JSON). Nothing else changed.
+- `nick/2026-10-28-m3/` — the same session as `2026-10-28-m2`, later snapshot (through the M3
+  crash demo and valgrind runs), plus all five of its subagent sessions. Same single edit as
+  M2: the password Nick typed on 2026-10-27 replaced with `[REDACTED-PASSWORD]` (34
+  occurrences, same `sed`; 0 invalid JSON lines after). Nothing else changed.
 - `liam/2026-09-23-m0-m1/` — Liam Sagal's sessions from this repo's own project directory
   (`~/.claude/projects/-s-parsons-g-under-C837127061-cs370-Term-Project/`). Copied as-is,
   unedited.
