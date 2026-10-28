@@ -9,6 +9,85 @@ verified, and what it leaves open.
 
 ---
 
+## 2026-10-28 (late) — Storage side S1–S5 done and pushed (Liam)
+
+- **Commits:** `d6ddff7` (S1: `store_sync`, counters), `8f93e45` (S3 `stored`, S4 `store_client.c`,
+  S5 `make itest`, plus the directory `fsync` Nick approved), `a4ac200` (S2: `store_scan`,
+  `dsq dump`). S6 (write batching) not started; only if asked after M3 is safe.
+- **Verified on topeka (CS department Linux, x86-64), not the Pi:** `make test` 496 checks,
+  0 failed; `make itest` 137 checks, 0 failed (and 10 repeat runs); `make asan` both suites
+  pass; `make clean && make memcheck` 0 errors, 0 bytes in use, for `test_all` and for
+  `itest_stored` with `stored` traced. Tests were written first and seen failing each time.
+- **Not yet verified:** any of it on `darksky.local` (step 1 of the integration run).
+
+### Build targets (confirmed with Nick)
+
+| Target | What | Where |
+|---|---|---|
+| `build/dsq` | `dsq dump` | `make all`, macOS and Linux |
+| `build/stored` | the daemon | `make all`, Linux only |
+| `build/itest_stored` | integration test | `make all`, Linux only |
+| `make itest` | runs `./build/itest_stored ./build/stored` | Linux; prints "needs Linux" on macOS |
+
+- `make asan` now also runs `itest` on Linux; `make memcheck` also runs it under valgrind with
+  `--trace-children=yes`, so `stored` itself is checked.
+- **`STORE_CLIENT_SRC`** (`src/store/store_client.c`) is the variable for the sensor programs'
+  link lines, for example
+  `$(CC) $(CFLAGS) src/sensors/skyd.c ... $(STORE_CLIENT_SRC) $(COMMON_SRC) -o build/skyd`.
+  The client needs only `src/common/` (record, CRC, logger), not the store library.
+- `dsq`'s formatting is in `DSQ_LIB` (`src/dsq/dump.c`), so the test binary and `build/dsq`
+  share it; `stored` does not link it.
+- Known, unchanged: after `make asan`, run `make clean` before `make memcheck` (both build into
+  `build/`, so memcheck would otherwise run the ASan binaries).
+
+### How to run it (for N4 / `tools/run-m3.sh`)
+
+```sh
+mkdir -p ~/dsm/data ~/dsm/run
+./build/stored ~/dsm/data/seg-000001.dsm ~/dsm/run/stored.sock 2>> ~/dsm/run/stored.log &
+# then the sensor programs, each given ~/dsm/run/stored.sock
+./build/dsq dump ~/dsm/data/seg-000001.dsm -n 20
+kill -TERM <stored pid>      # exit 0: drained, synced, socket removed
+```
+
+- `stored <data-file> <socket-path> [sync-seconds]`. The third argument is optional (default
+  60, 1–3600); the itest uses 1. Exit **0** stopped by SIGTERM/SIGINT; **1** bad arguments, a
+  file that isn't a store file, or the socket can't be set up (including a non-socket file at
+  the socket path, which it refuses to delete); **2** a write or `fsync` failed.
+- Log lines (stderr): `INFO start file=.. kept=.. sync_s=..`; `WARN recover kept=N
+  cut_bytes=K` when recovery cut anything; `INFO sync records=.. bad=.. clients=.. fsyncs=..`
+  every sync; `WARN bad_message len=..`, `WARN bad_record source=.. seq=..`; `INFO stop
+  records=..`. Every start appends a START record from source 6 (`stored`).
+- **Socket paths must be shorter than 108 bytes** (`sun_path`). `~/dsm/run/stored.sock` is fine.
+- `store_client_send()` never blocks (`O_NONBLOCK`, `MSG_NOSIGNAL`): with `stored` down or
+  behind it returns -1 and counts the drop; it retries the connection at most once per second.
+  It logs only changes of state, under the sensor program's own name: `store_connect`,
+  `store_connect_fail`, `store_disconnect`, `store_full`. Call `log_init()` before using it.
+- On SIGTERM `stored` reads in whatever clients already sent (up to 1024 per client) before
+  closing, so a clean stop loses no record whose `send()` succeeded.
+
+### Note for the D demo write-up (`docs/m3-checkpoint.md`)
+
+- **`kill -9 stored` leaves an expected `seq` gap.** Records already in the socket queue when it
+  dies are lost, and `store_client_dropped()` does not count them: their `send()` succeeded. The
+  next send after the kill fails (`EPIPE`) and is counted, and so is every send until the
+  reconnect. So "no `seq` gaps" holds for the clean run (step 2), not across the kill (step 3).
+  `itest` case "client through restart" shows the gap: seq 1–4 missing between two STARTs.
+- **Directory `fsync`** runs on every `store_open()`, not only when the file is new: a crash
+  between creating the file and syncing its directory would otherwise leave a file that looks
+  old on the next start, with its name still not on the card.
+
+### Open
+
+- `stored`'s exit 2 (failed write or `fsync`) is covered only at the library level
+  (`test_sync_on_broken_handle`); no itest case makes the daemon hit it.
+- Nothing stops two `stored`s on the same data file; at M4 `dskyd` is the only launcher. An
+  `fcntl` lock in `store_open()` would close it if wanted.
+- `DESIGN.md` note on the M3 slice and SEQPACKET being Linux-only (Nick's close-out item).
+- Cross-review: Liam's review of Nick's sensor code in `PROMPTLOG-liam.md`, once N3 is pushed.
+
+---
+
 ## 2026-10-28 (evening) — Shared pieces + sensor conversion math (Nick)
 
 - `1f74c77`: `record.h` (START kind, `enum dsm_source`, `enum dsm_fault`), `log.{c,h}`,
