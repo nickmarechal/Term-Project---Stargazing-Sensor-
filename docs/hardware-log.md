@@ -40,7 +40,7 @@ found.
 | microSD | | by 2026-10-27 | 2026-10-27 | Patriot LX 16 GB. Standard card: logging writes ~13 MB/day, so a high-endurance card isn't needed |
 | USB-C microSD reader | | 2026-10-27 | 2026-10-27 | Only needed to flash the card from a Mac without an SD slot |
 | Breadboard + jumper wires | | | | Wiring planned for 2026-10-27 evening |
-| DS3231 RTC | 2026-10-27 (Liam) | | | Until fitted, the Pi gets real time from NTP only, so it must boot on a network with internet |
+| DS3231 RTC | to be ordered | | | Until fitted, the Pi gets real time from NTP only, so it must boot on a network with internet |
 
 ## Known gap: M2 "both sensors electrically alive" not met (2026-10-27)
 

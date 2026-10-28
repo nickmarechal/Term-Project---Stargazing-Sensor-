@@ -112,7 +112,7 @@ All ‡ except parts marked *implemented*; details in [`docs/record-and-ipc.md`]
 |------------|-------------------------------------------|------------------------------------------|
 | Brightness | calibrated SQM → TSL2591, no reference | **relative to the site baseline**, never absolute mag/arcsec² |
 | Cloud | commercial sensor → MLX90614 + BME280, own humidity fit | if humid-clear and overcast don't separate, the claim narrows to dry nights |
-| Hardware | Adafruit, 2 GB Pi, endurance card, DS3231, enclosure → clones, 1 GB Pi 4, standard 16 GB, no RTC (ordered 2026-10-27), no enclosure | BME280 may be a BMP280 (hardware-log §2); MLX FOV unknown; offline reboot → UNKNOWN until network time; no outdoor runs; Pi, card fine (a) |
+| Hardware | Adafruit, 2 GB Pi, endurance card, DS3231, enclosure → clones, 1 GB Pi 4, standard 16 GB, no RTC (to be ordered), no enclosure | BME280 may be a BMP280 (hardware-log §2); MLX FOV unknown; offline reboot → UNKNOWN until network time; no outdoor runs; Pi, card fine (a) |
 | Kits | one → two: `darksky.local` (Nick), `starlight.local` (Liam) | soak, demo, all evaluation numbers **only from `darksky.local`**; kit differences in hardware log |
 | User, truth | named astronomer, months of labels → archetype; obs. log + `SYNTHETIC` provoked data | requirements from PROBLEM.md; counts, not %, on small n |
 | Budget | $50–80 per team (spec §17) → Nick ≈ $68 (Pi $35 + sensors ≈ $33), Liam $77 (Pi $45 + sensors $32): **team ≈ $145** | **≈ $65 over the guideline's top (≈ 1.8×)**, before unrecorded PSUs, SD cards, RTC, enclosure; each kit alone is within it |

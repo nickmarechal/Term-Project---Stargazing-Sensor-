@@ -78,7 +78,7 @@ sockets. With no RTC: `CLOCK_UNSYNC` flag and an UNKNOWN verdict.
   number. `starlight.local` (Liam: Pi $45 + sensors $32 = $77) is for development only. Team
   ≈ $145 against the handout's $50–80 guideline, before the unrecorded PSUs, SD cards, RTC and
   enclosure.
-- DS3231 ordered 2026-10-27 (Liam).
+- DS3231 RTC: to be ordered.
 - **No sensor wired on either kit.** "Both sensors electrically alive" was not met for M2; target
   2026-11-03 for hardware-log §1–5 on `darksky.local`.
 

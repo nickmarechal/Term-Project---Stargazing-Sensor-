@@ -23,7 +23,7 @@ and is not required to work in this repo.)
   **3.3 V** + BME280; arrived 2026-10-13, set up headless 2026-10-27, I2C on, power `0x0`) is the
   **device of record**: the soak, the demo and every evaluation number come only from it.
   **`starlight.local`** (Liam's dev Pi + the same three sensors) is for parallel development only.
-  **No sensors wired on either kit yet.** DS3231 RTC ordered 2026-10-27; until it is fitted the Pi
+  **No sensors wired on either kit yet.** DS3231 RTC to be ordered; until it is fitted the Pi
   takes real time from the network at boot. Enclosure still unbought. See
   [`docs/hardware-log.md`](docs/hardware-log.md) and [`docs/bill-of-materials.md`](docs/bill-of-materials.md).
 - **Mechanisms: D** (crash-consistent storage) **+ E** (multiprocess + IPC + supervisor). C and F
