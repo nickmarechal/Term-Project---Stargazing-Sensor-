@@ -117,19 +117,67 @@ is a stretch goal only if M3 lands early; **B** would only be honest with a puls
 
 ## Failure-mode table
 
-For each component: how it can fail, how the failure is detected, what the system does about it,
-and what the log will show. **The 48-hour soak grades this table's honesty.**
+Every row names how we will inject it, so EVALUATION.md can report each one (spec §9). Log lines
+follow `<ISO time> <mono s> <proc>[pid] <LEVEL> <event> k=v…`; the column shows LEVEL onward.
+They are **examples of the planned format, not captured output**. ‡ = **proposed (Liam), Nick to
+confirm**.
 
-| Component | How it fails | How we detect it | What the system does | What the log shows |
-|---|---|---|---|---|
-| TODO | TODO | TODO | TODO | TODO |
+| Component | Failure (injected by) | Detected by → system does | Log shows |
+|-------------|---------------|-----------------------------------------|----------------------|
+| sensor daemon | unplugged (pull its jumper) | 3 failed reads, errno `EREMOTEIO`/`ENXIO` (a) → FAULT rec, exit "absent"; `dskyd`: `DEAD`, re-probe every 60 s; verdict UNKNOWN | `ERROR cloudd read_fail errno=EREMOTEIO n=3` |
+| sensor daemon | hung (`kill -STOP`) | no liveness byte for 20 s → `SIGKILL`, restart | `WARN dskyd envd hung action=SIGKILL` |
+| any child | crash (`kill -9`) | pipe EOF + `SIGCHLD` → restart with 1→60 s backoff, new run. Meanwhile rings hold ≥17 min for `fusiond`, and `fusiond` buffers 4096 recs for `stored` ‡ | `WARN dskyd skyd died sig=9 run=4` |
+| any child | restart storm (5× `kill -9` in 5 min) | → `DEAD`, re-probe every 60 s; the rest keeps running | `ERROR dskyd cloudd storm state=DEAD` |
+| I2C bus | all sensors lost (pull the head's 3.3 V wire) | all daemons absent within 30 s → UNKNOWN "no sensors". A real bus lockup can't be injected safely; it takes this path | `ERROR dskyd all_sensors_absent` |
+| reading | saturated (flashlight on TSL2591) | range check → SAMPLE without `VALID`, ignored by `fusiond` | `WARN skyd saturated ch0=65535` |
+| IR window | dew (breathe on it; `SYNTHETIC`) | dew margin < 1 °C + ΔT collapse while brightness holds (a) → "likely condensation, not cloud" | `WARN fusiond condensation` |
+| `stored` ‡ | power cut mid-write (pull the plug) | boot-time CRC scan → truncate at the first bad record | `WARN stored recover cut_bytes=31` |
+| `stored` ‡ | write error (`remount,ro`); disk < 2 GB (ballast file) | syscall error → exit, recover on restart; `statvfs()` → raw writes off, rollups continue | `ERROR stored write_fail errno=EROFS` |
+| `dskyd` | crash (`kill -9`) | systemd → children exit (`PR_SET_PDEATHSIG`); the tree restarts in 1 s | `dskyd.service: Main process exited` |
+| clock | no RTC, no network (power-cycle offline) | `adjtimex()` unsynchronized → `CLOCK_UNSYNC` flag, verdict UNKNOWN; sampling continues | `WARN fusiond clock_unsync` |
+| any process | slow leak (not injectable; watched over the soak) | hourly RSS in HEARTBEAT → a visible trend | `INFO dskyd hb fusiond rss_kb=812` |
+| `dsq` | queried while `fusiond` is down | `connect()` fails → "UNKNOWN (hub down)"; history still readable; exit 2 | `state: UNKNOWN (hub down)` |
 
 ## Storage and data
 
-What is stored, at what rate, in what format, with what retention, and **what happens to it when
-the power dies mid-write.**
+Everything in this section is **proposed (Liam), Nick to confirm**, except where marked
+*implemented*.
 
-**TODO.**
+- **Record** (*implemented*, `src/common/record.h`): 48 bytes, little-endian. Fields: two
+  timestamps, schema, `source_id`, `kind`, `flags`, four `int32` fixed-point values, `seq`, and
+  a CRC-32 over the first 44 bytes. **≈1.37 rec/s ≈ 5.7 MB/day ≈ 1.0 GB per 180 days**
+  (computed; checked against real file sizes after the first 24 h run).
+- **Segments:** `data/seg-NNNNNN.dsm` = a 24-byte header (*implemented*) + records. One per
+  night, rotated at local noon (every 24 h of monotonic time if the clock is unsynced), capped at
+  32 MB. `data/rollup/` holds one summary per night.
+- **Durability:** `write()` every 10 s or 64 recs; `fsync()` every 60 s, at rotation and at
+  shutdown; directory `fsync()` after creating a segment. **Retention:** raw 180 days, rollups
+  forever; below 2 GB free, raw writes stop (logged) and rollups and heartbeats continue.
+
+| `source_id` | `kind` | `v[0]` · `v[1]` · `v[2]` · `v[3]` |
+|-------------|------------|-------------------------------------------------------|
+| 1 `skyd` | SAMPLE | CH0 count · CH1 count · gain multiplier · integration ms |
+| 2 `cloudd` | SAMPLE | sky (object) m°C · ambient m°C · 0 · 0 |
+| 3 `envd` | SAMPLE | temperature m°C · humidity milli-%RH · pressure Pa · 0 |
+| 4 `fusiond` | FEATURE; STATE | feature id · value ×1000 · window s · n; state · rules-fired bitmask · confidence ×1000 · 0 |
+| 5 `dskyd` | HEARTBEAT | subject `source_id` · RSS KiB · CPU ms · cumulative events |
+| any (6 `stored`) | FAULT; START | code · errno · consecutive count · 0; run number · 0 · 0 · 0 |
+
+`source_id` 0 is reserved. Flags: `VALID`, `STALE`, `SYNTHETIC` (all replayed or provoked
+data), `CALIBRATING`, plus a new `CLOCK_UNSYNC` bit, with no layout change. A failed read is a
+**FAULT**; a read with an implausible value is a **SAMPLE without `VALID`**. `seq` counts per
+(source, run): every process start writes a START record (`seq` 0, run number from `dskyd`). A
+gap within a run is provable loss; the gap between runs is the restart time.
+
+**Power cut mid-write.** At most the last 60 s are lost (R-D1). The open segment may end in a
+torn record or in zeros, and an all-zero record never passes its CRC (*tested*). On start,
+`stored` checks each 48-byte slot of the open segment, truncates at the first bad one,
+`fsync()`s, and logs counts kept and cut. Closed segments were `fsync()`ed at rotation and are
+not rescanned. A 1–23-byte file with our segment name in our directory is a torn header and is
+recreated; any other short file is refused. `fusiond`-restart duplicates are removed at query
+time by (source, run, seq). *Implemented today* (116 checks, ASan and valgrind clean): header
+checks, refusal of foreign files and unsealed records, stopping after a failed write. *M3:*
+recovery, batching, `fsync`, rotation, rollups.
 
 ## Constraints and substitutions
 
