@@ -14,6 +14,7 @@ int main(void)
     test_store();
     test_dsq();
     test_convert();
+    test_verdict();
 
     printf("%d checks, %d failed\n", check_count, check_failures);
     return check_failures == 0 ? 0 : 1;

@@ -8,5 +8,6 @@ void test_log(void);
 void test_store(void);
 void test_dsq(void);
 void test_convert(void);
+void test_verdict(void);
 
 #endif

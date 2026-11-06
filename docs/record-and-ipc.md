@@ -37,7 +37,7 @@ and left untouched.
 | FEATURE | 2 | | `STALE` | 1 |
 | STATE | 3 | | `SYNTHETIC` (all replayed or provoked data) | 2 |
 | HEARTBEAT | 4 | | `CALIBRATING` (sensor warming up) | 3 |
-| FAULT | 5 | | `CLOCK_UNSYNC` (*proposed*) | 4 |
+| FAULT | 5 | | `CLOCK_UNSYNC` | 4 |
 | START (*proposed*) | 6 | | | |
 
 0 is never a valid kind or `source_id`, so a zeroed record never looks real.
@@ -65,6 +65,26 @@ and left untouched.
 - **`seq` per run:** each process start writes START with `seq` 0. A gap within a run is
   provable loss; the time between runs is the restart gap.
 
+### States, rules and feature IDs
+
+Defined in `src/analysis/verdict.h` and pinned by `tests/test_verdict.c`. These numbers are on disk,
+so new ones only go on the end.
+
+| STATE `v[0]` | | Rule bit in STATE `v[1]` | | FEATURE `v[0]` | Unit of `v[1]` ÷ 1000 |
+|---|---|---|---|---|---|
+| 1 BOOT | | 0 `SUN_UP` | | 1 `SKY_REL` | mag, relative; larger = darker |
+| 2 DAYLIGHT | | 1 `TWILIGHT` | | 2 `SKY_SIGMA` | mag |
+| 3 TWILIGHT | | 2 `SENSOR_MISSING` | | 3 `DT` | °C, air − sky |
+| 4 UNKNOWN | | 3 `LOW_DATA` | | 4 `DT_CORR` | °C |
+| 5 POOR | | 4 `BASELINE_IMMATURE` | | 5 `DT_SIGMA` | °C |
+| 6 MARGINAL | | 5 `CLOCK_UNSYNC` | | 6 `DEW_MARGIN` | °C |
+| 7 GOOD | | 6 `OVERCAST` | | 7 `PRESS_TREND` | Pa/h |
+| | | 7 `DEW` | | 8 `SUN_ALT` | degrees |
+| | | 8 `BROKEN_CLOUD` | | 9 `MOON_ALT` | degrees |
+| | | 9 `UNSTABLE_SKY` | | 10 `MOON_ILLUM` | fraction, 0 to 1 |
+| | | 10 `MOONLIGHT` | | | |
+| | | 11 `NOT_DARK_ENOUGH` | | | |
+
 ## Rate derivation (computed, not measured)
 
 | Record | Rate | Records/day |
@@ -72,7 +92,7 @@ and left untouched.
 | `skyd` SAMPLE | 1 per 5 s | 17 280 |
 | `cloudd` SAMPLE | 1 per 1 s | 86 400 |
 | `envd` SAMPLE | 1 per 10 s | 8 640 |
-| FEATURE | 4 per min | 5 760 |
+| FEATURE | 4 per min (all 10 features every 150 s, `m4-plan.md`) | 5 760 |
 | STATE | on change, ≥ 1 per 10 min | ≥ 144 |
 | HEARTBEAT | 6 per h (5 children + `dskyd`) | 144 |
 | FAULT, START | per event | ≈ 0 in steady state |

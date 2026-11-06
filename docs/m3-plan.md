@@ -220,6 +220,6 @@ Friday.
 
 ## Deferred to M4
 
-Segments and rotation, `MANIFEST`, torn-header (1–23 B) recreation, `dskyd`, the shm rings,
+Segments and rotation, `MANIFEST` (later dropped: `DESIGN.md` has none, see `m4-plan.md`), torn-header (1–23 B) recreation, `dskyd`, the shm rings,
 `fusiond`, heartbeats, `CLOCK_UNSYNC`. If Friday is tight, cut in this order: batching → `envd` →
 `dsq` polish → the plug-pull (`kill -9` plus the provoked torn tail still show D working).

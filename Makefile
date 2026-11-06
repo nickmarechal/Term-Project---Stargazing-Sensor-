@@ -42,9 +42,14 @@ SENSOR_LINUX_SRC := src/sensors/i2c.c src/sensors/chips.c src/sensors/daemon.c
 SENSOR_LINUX_HDR := src/sensors/i2c.h src/sensors/chips.h src/sensors/daemon.h
 SENSOR_BIN       := build/skyd build/cloudd build/envd build/sensorcheck
 
-SRC  := $(COMMON_SRC) $(STORE_SRC) $(DSQ_LIB) $(SENSOR_SRC)
-TSRC := tests/test_main.c $(COMMON_TSRC) $(STORE_TSRC) $(SENSOR_TSRC)
-HDR  := tests/check.h tests/suites.h $(COMMON_HDR) $(STORE_HDR) $(SENSOR_HDR)
+# --- analysis (src/analysis; portable). Interfaces are in docs/m4-plan.md. ---
+ANALYSIS_SRC  :=
+ANALYSIS_TSRC := tests/test_verdict.c
+ANALYSIS_HDR  := src/analysis/ephemeris.h src/analysis/features.h src/analysis/verdict.h
+
+SRC  := $(COMMON_SRC) $(STORE_SRC) $(DSQ_LIB) $(SENSOR_SRC) $(ANALYSIS_SRC)
+TSRC := tests/test_main.c $(COMMON_TSRC) $(STORE_TSRC) $(SENSOR_TSRC) $(ANALYSIS_TSRC)
+HDR  := tests/check.h tests/suites.h $(COMMON_HDR) $(STORE_HDR) $(SENSOR_HDR) $(ANALYSIS_HDR)
 
 TESTBIN := build/test_all
 

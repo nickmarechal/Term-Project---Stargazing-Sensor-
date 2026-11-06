@@ -42,6 +42,7 @@ enum dsm_flag {
     DSM_FLAG_STALE       = 1u << 1,
     DSM_FLAG_SYNTHETIC   = 1u << 2,
     DSM_FLAG_CALIBRATING = 1u << 3,
+    DSM_FLAG_CLOCK_UNSYNC = 1u << 4,  /* t_real_ns can't be trusted (no NTP or RTC) */
 };
 
 /* One record, exactly as it sits on disk. */

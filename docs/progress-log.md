@@ -9,6 +9,22 @@ verified, and what it leaves open.
 
 ---
 
+## 2026-11-06 — M4 plan and shared interfaces (Nick)
+
+- **[`m4-plan.md`](m4-plan.md) written: read it before starting M4 work.** Who does what, contracts,
+  steps. **Liam hasn't agreed to it yet**, and it has 4 questions for him, including who owns the site
+  baseline (without one the device can never say GOOD).
+- **Interfaces only, no logic:** `src/analysis/ephemeris.h`, `features.h`, `verdict.h`;
+  `DSM_FLAG_CLOCK_UNSYNC` added to `record.h`. `classify()` and the rest are declared but not written.
+- **Verified on macOS only:** `make test` 530 checks, 0 failed (`tests/test_verdict.c` pins every
+  state, rule, feature and flag number on disk); `make asan` passes. Not yet built on Linux.
+- **Docs brought up to date:** `DESIGN.md` ownership map + new changelog, `CLAUDE.md` next action,
+  `record-and-ipc.md` state/rule/feature table, `MANIFEST` note in `m3-plan.md`.
+- **Open:** `dump.c` prints the new flag as `0x10` until it gets a name (question 4). No real sky data
+  exists yet, and no Pi work has happened since 10-28.
+
+---
+
 ## 2026-10-28 (night) — M3 met on darksky.local: sensors → stored → store, D demo (Nick)
 
 - **N2–N3 done** (`efc5261`): `src/sensors/i2c.{c,h}` (`I2C_RDWR`, repeated start), `chips.{c,h}`

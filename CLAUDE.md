@@ -34,9 +34,10 @@ and is not required to work in this repo.)
   the 2026-10-27 M2 entry of [`docs/progress-log.md`](docs/progress-log.md)) were confirmed by
   Nick on 2026-10-28. Values marked (a) are datasheet assumptions,
   not measurements. Record, IPC and supervision detail: [`docs/record-and-ipc.md`](docs/record-and-ipc.md).
-- **Next action: M3, per [`docs/m3-plan.md`](docs/m3-plan.md)** (Canvas closes Fri 2026-10-30,
-  8 pm MT). It says who does what, the interface between the storage and sensor sides, and the
-  steps for each. Hardware-log §3–5 on `darksky.local` are still open after that.
+- **Next action: M4, per [`docs/m4-plan.md`](docs/m4-plan.md)** (spec week 14, Nov 23–27, may shift;
+  check Canvas; target code freeze Nov 20). It says who does what, the interfaces between the two
+  sides, and the steps for each. **M3 met 2026-10-28** ([`docs/m3-checkpoint.md`](docs/m3-checkpoint.md)).
+  Hardware-log §3–5 on `darksky.local` are still open.
 - **Open gap:** the problem memo names an archetype, not a named individual. Outreach to the
   Northern Colorado Astronomical Society / CSU astronomy faculty still pending.
 

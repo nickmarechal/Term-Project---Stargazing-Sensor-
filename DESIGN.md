@@ -144,11 +144,13 @@ Targets are commitments, not results. (a) = hardware-dependent; loaded = `stress
 
 ## Ownership map
 
-First authorship and defense answerability; each reviews the other's diffs (matches `CLAUDE.md`).
-**Liam (E):** `src/super/` (`dskyd`), `src/sensors/` (`skyd`, `cloudd`, `envd`, I2C layer), IPC
-(rings, sockets, pipes, `fusiond`'s ring loop); classifier + state machine. **Nick (D):**
-`src/common/`, `src/store/` (`stored`, recovery, rollups); features, ephemeris, `dsq`. **Both:**
-Makefile, tests, `CLAUDE.md`, docs, the device of record.
+First authorship and defense answerability; each reviews the other's diffs (matches `CLAUDE.md`;
+changed at M3, see the changelog). **Liam (E):** `src/super/` (`dskyd`), rings, `fusiond`'s ring loop;
+`src/store/` from M3 on (`fsync`, `stored`, `store_client.c`, batching); `dsq dump`; classifier + state
+machine. **Nick:** `src/common/`; the store library through crash recovery; `src/sensors/` (`skyd`,
+`cloudd`, `envd`, I2C layer); features, ephemeris, `dsq`'s query commands. **D is shared:** the format
+and recovery are Nick's, the daemon that runs them is Liam's. **Both:** Makefile, tests, `CLAUDE.md`,
+docs, the device of record.
 
 ## AI-use plan
 
@@ -160,3 +162,17 @@ Makefile, tests, `CLAUDE.md`, docs, the device of record.
   IP sockets**; a future LAN interface would be one listen-only file. This prints nothing:
   `grep -rnE 'AF_INET|PF_INET|getaddrinfo|gethostbyname|curl|https?://' src/`. Only the OS's
   clock sync uses the network (until the DS3231); offline, the product reports UNKNOWN.
+
+## Changelog since M2
+
+What M2 got wrong or changed later, as spec §12 asks for at M5.
+
+- **2026-10-28, ownership:** sensors moved to Nick because only `darksky.local` was wired; the storage
+  side from M3 on moved to Liam because `stored`'s socket runs only on Linux, which he develops on.
+- **2026-10-28, M3 slice:** M3 connected the sensor programs straight to `stored`, without rings,
+  `fusiond` or `dskyd`, which come at M4. The architecture above is unchanged.
+- **Found at M3: `SOCK_SEQPACKET` runs on Linux only.** On macOS `socket()` fails with "Protocol not
+  supported", so that code and its tests run only on Linux. Everything else builds and tests on a Mac.
+- **2026-11-06, interfaces:** `src/analysis/` headers and `docs/m4-plan.md` added. **Proposed, pending
+  Liam:** all 10 features are written together every 150 s, which keeps the 4-per-minute FEATURE rate
+  above.
