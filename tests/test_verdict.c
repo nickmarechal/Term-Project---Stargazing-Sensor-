@@ -64,7 +64,6 @@ static void test_site(void)
     const struct ephem_site site = EPHEM_SITE_FORT_COLLINS;
     CHECK(site.lat_deg > 40.0 && site.lat_deg < 41.0, "lat %f", site.lat_deg);
     CHECK(site.lon_deg > -106.0 && site.lon_deg < -105.0, "lon %f (west is negative)", site.lon_deg);
-    CHECK(site.height_m > 1400.0 && site.height_m < 1600.0, "height %f", site.height_m);
 }
 
 static void test_sensor_table(void)

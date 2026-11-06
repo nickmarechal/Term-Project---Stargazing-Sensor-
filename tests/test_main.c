@@ -15,6 +15,7 @@ int main(void)
     test_dsq();
     test_convert();
     test_verdict();
+    test_ephemeris();
 
     printf("%d checks, %d failed\n", check_count, check_failures);
     return check_failures == 0 ? 0 : 1;

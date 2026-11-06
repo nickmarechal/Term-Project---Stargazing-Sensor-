@@ -43,9 +43,10 @@ SENSOR_LINUX_HDR := src/sensors/i2c.h src/sensors/chips.h src/sensors/daemon.h
 SENSOR_BIN       := build/skyd build/cloudd build/envd build/sensorcheck
 
 # --- analysis (src/analysis; portable). Interfaces are in docs/m4-plan.md. ---
-ANALYSIS_SRC  :=
-ANALYSIS_TSRC := tests/test_verdict.c
-ANALYSIS_HDR  := src/analysis/ephemeris.h src/analysis/features.h src/analysis/verdict.h
+ANALYSIS_SRC  := src/analysis/ephemeris.c
+ANALYSIS_TSRC := tests/test_verdict.c tests/test_ephemeris.c
+ANALYSIS_HDR  := src/analysis/ephemeris.h src/analysis/features.h src/analysis/verdict.h \
+                 tests/data/ephemeris_reference.inc
 
 SRC  := $(COMMON_SRC) $(STORE_SRC) $(DSQ_LIB) $(SENSOR_SRC) $(ANALYSIS_SRC)
 TSRC := tests/test_main.c $(COMMON_TSRC) $(STORE_TSRC) $(SENSOR_TSRC) $(ANALYSIS_TSRC)
@@ -69,7 +70,7 @@ all: $(TESTBIN) build/dsq $(LINUX_BIN)
 
 $(TESTBIN): $(SRC) $(TSRC) $(HDR)
 	@mkdir -p build
-	$(CC) $(CFLAGS) $(SRC) $(TSRC) -o $@
+	$(CC) $(CFLAGS) $(SRC) $(TSRC) -o $@ -lm
 
 build/dsq: $(DSQ_SRC) $(DSQ_LIB) $(COMMON_SRC) $(STORE_SRC) $(COMMON_HDR) $(STORE_HDR)
 	@mkdir -p build

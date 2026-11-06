@@ -10,12 +10,11 @@
 struct ephem_site {
     double lat_deg;    /* north is positive */
     double lon_deg;    /* east is positive, so Colorado is negative */
-    double height_m;   /* above sea level */
 };
 
 /* Rounded city-center location, not the address of the device. At this
  * precision the position error is far below the accuracy targets. */
-#define EPHEM_SITE_FORT_COLLINS { 40.59, -105.08, 1525.0 }
+#define EPHEM_SITE_FORT_COLLINS { 40.59, -105.08 }
 
 struct ephem_pos {
     double sun_alt_deg;    /* degrees above the horizon; negative = below */

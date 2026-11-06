@@ -9,6 +9,26 @@ verified, and what it leaves open.
 
 ---
 
+## 2026-11-06 — N1: sun and moon position (Nick)
+
+- **`src/analysis/ephemeris.c`:** sun and moon altitude and the moon's lit fraction, from The Astronomical
+  Almanac's low-precision formulas. No network; links `-lm`.
+- **Checked against NASA/JPL Horizons at 70 date/times, 2026–2028** (60 Fort Collins, 10 Sydney to prove
+  the site is really used), saved in `tests/data/ephemeris_reference.inc` by
+  `tools/fetch_ephemeris_reference.py`. **Worst error: sun 0.009°, moon 0.211°, lit fraction 0.007**,
+  against `DESIGN.md` #12's 0.1° and 0.5° (the 0.02 lit-fraction limit is ours).
+- **Deliberate breakages, each with a forced rebuild:** caught: no parallax (moon 1.034°, 56 checks
+  fail), longitude sign, no axial tilt, main moon terms, sun's main term, 12 h epoch error, phase
+  backward. Not caught, as expected because each is under the limits: the smallest moon term (0.286°).
+- **Removed after measuring:** the Earth's flattening and the site's height changed the worst moon
+  error by 0.002°, so `height_m` and that code are gone. That also removed the height check from
+  `test_verdict.c`, because the field no longer exists.
+- **Verified on macOS only:** `make test` and `make asan`. Not yet built on Linux or the Pi.
+- **Limit:** the answer is only as good as the clock (no RTC). The formulas are for dates near 2000;
+  they were checked only for 2026–2028.
+
+---
+
 ## 2026-11-06 — M4 plan and shared interfaces (Nick)
 
 - **[`m4-plan.md`](m4-plan.md) written: read it before starting M4 work.** Who does what, contracts,
